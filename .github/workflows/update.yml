@@ -9,6 +9,11 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      refresh_odds:
+        description: "Refresh the bookmaker odds now (costs 9 of the 500 monthly credits)"
+        type: boolean
+        default: false
 
 permissions:
   contents: write           # commit data/latest.*
@@ -38,6 +43,7 @@ jobs:
         env:
           FOOTBALL_DATA_ORG_KEY: ${{ secrets.FOOTBALL_DATA_ORG_KEY }}
           ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
+          ODDS_FORCE: ${{ inputs.refresh_odds && '1' || '' }}
         run: python3 collector/collect.py
 
       - name: Save collector cache
