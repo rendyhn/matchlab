@@ -1,0 +1,78 @@
+# MatchLab - refresh the data every 2 hours and publish the site on GitHub Pages.
+# The API keys come from the repository secrets FOOTBALL_DATA_ORG_KEY and ODDS_API_KEY
+# (Settings > Secrets and variables > Actions); GitHub hides them in the log.
+name: Update data & publish
+
+on:
+  schedule:
+    - cron: "7 */2 * * *"   # every 2 hours at :07 UTC; GitHub may start a scheduled run a few minutes late
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write           # commit data/latest.*
+  pages: write
+  id-token: write
+
+concurrency:
+  group: matchlab
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      # the collector's download cache survives between runs here (never in the repo)
+      - name: Restore collector cache
+        uses: actions/cache/restore@v4
+        with:
+          path: collector/cache
+          key: collector-${{ github.run_id }}
+          restore-keys: collector-
+
+      - name: Collect data
+        env:
+          FOOTBALL_DATA_ORG_KEY: ${{ secrets.FOOTBALL_DATA_ORG_KEY }}
+          ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
+        run: python3 collector/collect.py
+
+      - name: Save collector cache
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: collector/cache
+          key: collector-${{ github.run_id }}
+
+      - name: Commit the new snapshot
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/latest.json data/latest.js
+          if git diff --cached --quiet; then echo "no change"; exit 0; fi
+          git commit -m "data: $(date -u '+%Y-%m-%d %H:%M') UTC"
+          git pull --rebase
+          git push
+
+      - name: Build the site
+        run: |
+          mkdir -p _site/data
+          cp index.html _site/
+          cp data/latest.js data/latest.json _site/data/
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: update
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
