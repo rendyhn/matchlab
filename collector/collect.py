@@ -207,6 +207,100 @@ class NameMap:
         return None
 
 
+# ------------------------------------------------------------------ team identity
+# openfootball renames clubs between seasons and divisions ("VfL Bochum 1848" in the Bundesliga,
+# "VfL Bochum" in 2. Bundesliga; "Deportivo La Coruña" / "RC Deportivo La Coruña"). Mirrored by
+# canonicalNames() in engine.js - keep the two identical.
+RESERVE = frozenset({"b", "ii", "iii", "u23", "u21", "u19", "jong", "castilla", "reserves", "atletic"})
+
+
+def canonical_names(records, cup_code="uefa.cl"):
+    """records: iterable of (name, season, comp, day). Two names are one club when they come from the
+    same country, one's name tokens contain the other's, reserve markers agree ("Real Sociedad B" is
+    not "Real Sociedad") and they never appear in the same season. Returns {name: canonical name},
+    the canonical name being the one used most recently."""
+    info = {}
+    for name, season, comp, day in records:
+        x = info.setdefault(name, {"seasons": set(), "countries": set(), "last": 0})
+        x["seasons"].add(season)
+        x["last"] = max(x["last"], day)
+        if comp != cup_code:
+            x["countries"].add(comp.split(".")[0])
+    names = sorted(info)
+    tok = {n: frozenset(toks(n)) for n in names}
+    for n in names:
+        if not info[n]["countries"]:
+            info[n]["countries"] = {"cup"}
+    pairs = []
+    for i, a in enumerate(names):
+        for b in names[i + 1:]:
+            ta, tb = tok[a], tok[b]
+            if not ta or not tb or not (ta <= tb or tb <= ta) or (ta & RESERVE) != (tb & RESERVE):
+                continue
+            if not (info[a]["countries"] & info[b]["countries"]) or info[a]["seasons"] & info[b]["seasons"]:
+                continue
+            pairs.append((-len(ta & tb) / max(len(ta), len(tb)), a, b))
+    parent = {n: n for n in names}
+    group = {n: {"seasons": set(info[n]["seasons"]), "countries": set(info[n]["countries"])} for n in names}
+
+    def find(n):
+        while parent[n] != n:
+            n = parent[n]
+        return n
+    for _, a, b in sorted(pairs):
+        ra, rb = find(a), find(b)
+        if ra == rb or group[ra]["seasons"] & group[rb]["seasons"] or not (group[ra]["countries"] & group[rb]["countries"]):
+            continue
+        parent[rb] = ra
+        group[ra]["seasons"] |= group[rb]["seasons"]
+        group[ra]["countries"] |= group[rb]["countries"]
+    members = defaultdict(list)
+    for n in names:
+        members[find(n)].append(n)
+    out = {}
+    for ms in members.values():
+        canon = max(ms, key=lambda n: (info[n]["last"], n))
+        for n in ms:
+            out[n] = canon
+    return out
+
+
+# ------------------------------------------------------------------ Elo (mirrored by eloRun() in engine.js)
+ELO = {"K": 20.0, "hfa": 70.0, "newTop": 1500.0, "newSecond": 1350.0}
+SECOND_TIER = {"en.2", "es.2", "de.2", "it.2", "fr.2"}
+
+
+def elo_run(rows, ratings=None, cfg=ELO):
+    """Goal-margin Elo, frozen for a week at a time (Monday to Sunday) like the model's weekly refits:
+    every match of a week is rated with the ratings from before that week, then the week's results
+    are applied. rows: chronological dicts with d, h, a, hg, ag, comp. Returns (pre-match
+    R_home - R_away per row, final ratings)."""
+    R = dict(ratings or {})
+    dr = [0.0] * len(rows)
+    k = 0
+    while k < len(rows):
+        wk = rows[k]["d"] - timedelta(days=rows[k]["d"].weekday())
+        j = k
+        while j < len(rows) and rows[j]["d"] - timedelta(days=rows[j]["d"].weekday()) == wk:
+            j += 1
+        for i in range(k, j):
+            r = rows[i]
+            for t in (r["h"], r["a"]):
+                if t not in R:
+                    R[t] = cfg["newSecond"] if r["comp"] in SECOND_TIER else cfg["newTop"]
+            dr[i] = R[r["h"]] - R[r["a"]]
+        for i in range(k, j):
+            r = rows[i]
+            e = 1 / (1 + 10 ** (-(dr[i] + cfg["hfa"]) / 400))
+            gd = abs(r["hg"] - r["ag"])
+            g = 1.0 if gd <= 1 else 1.5 if gd == 2 else (11 + gd) / 8
+            s = 1.0 if r["hg"] > r["ag"] else 0.5 if r["hg"] == r["ag"] else 0.0
+            R[r["h"]] += cfg["K"] * g * (s - e)
+            R[r["a"]] -= cfg["K"] * g * (s - e)
+        k = j
+    return dr, R
+
+
 # ------------------------------------------------------------------ openfootball
 def score_ft(sc, d, today):
     ft = None
@@ -256,6 +350,67 @@ def load_openfootball(y0):
     last = max((r["d"] for r in played if r["season"] == skey(y0) and not r["cup"]), default=None)
     status.update(ok=True, played=len(played), fixtures=len(fixtures), lastMatch=last and last.isoformat())
     return played, fixtures, status
+
+
+def elo_start(y0, fd=None, first=2018):
+    """Elo ratings on 1 July of y0-2 - where the three seasons the page loads begin - from every
+    season since `first`. The page carries them forward through its own data; with only three
+    seasons of history Elo is much weaker (model-lab/RESULTS.md)."""
+    start = date(y0 - 2, 7, 1)
+    today = date.today()
+    rows, names, cup_seasons = [], [], set()
+    for y in range(first, y0 + 1):
+        s = skey(y)
+        for code in list(LEAGUES) + HISTORY_ONLY + [CUP["code"]]:
+            age = 0.5 if y == y0 else (24 * 30 if y >= y0 - 2 else None)
+            try:
+                j, _ = cached(f"of_{s}_{code}", lambda: json.loads(http(f"{OF_BASE}{s}/{code}.json")[0]), age)
+            except Exception:
+                continue
+            if code == CUP["code"]:
+                cup_seasons.add(s)
+            for m in j.get("matches", []):
+                if not m.get("team1") or not m.get("team2") or not m.get("date"):
+                    continue
+                d = date.fromisoformat(m["date"])
+                h, a = clean(m["team1"]), clean(m["team2"])
+                names += [(h, s, code, d.toordinal()), (a, s, code, d.toordinal())]
+                ft = score_ft(m.get("score"), d, today)
+                if ft and d < start:
+                    rows.append({"d": d, "h": h, "a": a, "hg": ft[0], "ag": ft[1], "comp": code, "s": s})
+    # Champions League seasons before the window that openfootball lacks (football-data.org's free tier reaches 2023/24)
+    if fd:
+        for y in range(2023, y0 - 2):
+            if skey(y) in cup_seasons:
+                continue
+            try:
+                nm = NameMap()
+                for code, L in LEAGUES.items():
+                    j, _ = cached(f"fd_{L['fd']}_{y}", lambda: fd.get(f"/competitions/{L['fd']}/matches?season={y}"), None)
+                    nm.learn([(utc_day(m["utcDate"]), m["homeTeam"]["name"], m["awayTeam"]["name"]) for m in j.get("matches", [])
+                              if (m.get("homeTeam") or {}).get("name")],
+                             [(r["d"], r["h"], r["a"]) for r in rows if r["comp"] == code and r["s"] == skey(y)])
+                pool = {n for n, *_ in names}
+                j, _ = cached(f"fd_CL_{y}", lambda: fd.get(f"/competitions/CL/matches?season={y}"), None)
+                for m in j.get("matches", []):
+                    hn, an = (m.get("homeTeam") or {}).get("name"), (m.get("awayTeam") or {}).get("name")
+                    sc = fd_score(m) if hn and an and m.get("status") == "FINISHED" else None
+                    if sc:
+                        d = utc_day(m["utcDate"])
+                        h, a = nm.get(hn, pool, 0.85) or clean(hn), nm.get(an, pool, 0.85) or clean(an)
+                        names += [(h, skey(y), CUP["code"], d.toordinal()), (a, skey(y), CUP["code"], d.toordinal())]
+                        if d < start:
+                            rows.append({"d": d, "h": h, "a": a, "hg": sc[0], "ag": sc[1], "comp": CUP["code"], "s": skey(y)})
+            except Exception as e:
+                log(f"  Elo: Champions League {y} unavailable ({str(e)[:80]})")
+    cmap = canonical_names(names, CUP["code"])
+    for r in rows:
+        r["h"], r["a"] = cmap[r["h"]], cmap[r["a"]]
+    rows.sort(key=lambda r: r["d"])
+    _, R = elo_run(rows)
+    return {"v": 1, "start": start.isoformat(), "matches": len(rows), "first": skey(first),
+            "cfg": ELO, "ratings": {t: round(v, 2) for t, v in sorted(R.items())},
+            "alias": {k: v for k, v in sorted(cmap.items()) if k != v}}
 
 
 # ------------------------------------------------------------------ football-data.org
@@ -343,6 +498,7 @@ def main():
     fd_names = NameMap()
 
     # 2. football-data.org ----------------------------------------------------------
+    fd = None
     if cfg["football_data_org_key"]:
         log("football-data.org ...")
         fd = FootballDataOrg(cfg["football_data_org_key"])
@@ -584,9 +740,21 @@ def main():
     sources["The Odds API"] = st
     log(f"  {len(odds)} matches with odds, credits left {st.get('remaining')}")
 
+    # 6. Elo ratings where the page's three seasons begin --------------------------------
+    log("Elo start ratings ...")
+    elo = None
+    try:
+        elo = elo_start(y0, fd)
+        log(f"  {len(elo['ratings'])} teams rated from {elo['matches']} matches before {elo['start']}, "
+            f"{len(elo['alias'])} club names unified")
+    except Exception as e:
+        log(f"  Elo failed: {str(e)[:160]}")
+        if (prev.get("elo") or {}).get("start") == date(y0 - 2, 7, 1).isoformat():
+            elo = prev["elo"]
+
     # ---- assemble, keeping the previous section of any source that failed this time
     snap.update(generated=iso(now_utc()), sources=sources, extra=extra, cupFixtures=cup_fixtures, xg=xg,
-                standings=standings, odds=odds, conflicts=conflicts)
+                standings=standings, odds=odds, conflicts=conflicts, elo=elo)
     for sect, src in (("standings", "football-data.org"), ("extra", "football-data.org"), ("cupFixtures", "football-data.org"),
                       ("xg", "Understat"), ("odds", "The Odds API")):
         if not snap[sect] and prev.get(sect):
