@@ -4,7 +4,7 @@ Win / draw / loss chances for Europe's football leagues, recomputed from the lat
 
 ## Website
 
-GitHub Actions (`.github/workflows/update.yml`) runs the collector every 2 hours, commits the new `data/latest.*` and publishes `index.html` + `data/` on GitHub Pages. Any upload to `main` publishes immediately. The Actions tab shows every run; "Run workflow" there starts one by hand.
+GitHub Actions (`.github/workflows/update.yml`) runs the collector every 2 hours, commits the new `data/latest.*` and publishes `index.html` + `data/` on GitHub Pages. Any upload to `main` publishes immediately. The Actions tab shows every run; "Run workflow" there starts one by hand, and its box "Refresh the bookmaker odds now" fetches new odds at once instead of waiting for the 24-hour refresh (9 credits).
 
 The keys live only in the repository secrets `FOOTBALL_DATA_ORG_KEY` and `ODDS_API_KEY` (Settings → Secrets and variables → Actions). The collector reads them from environment variables; GitHub hides them in the log.
 

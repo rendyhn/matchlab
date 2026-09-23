@@ -516,7 +516,11 @@ def main():
             t = datetime.strptime(prev_odds["fetchedAt"], "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc).timestamp()
             ometa = {"t": t, "remaining": prev_odds.get("remaining")}
         remaining = ometa.get("remaining")
-        fresh_enough = ometa.get("t") and (time.time() - ometa["t"]) / 3600 < cfg["odds_refresh_hours"]
+        # ODDS_FORCE=1: refresh now whatever the age (the "Refresh the bookmaker odds now" box of a manual run)
+        force = os.environ.get("ODDS_FORCE") == "1"
+        fresh_enough = not force and ometa.get("t") and (time.time() - ometa["t"]) / 3600 < cfg["odds_refresh_hours"]
+        if force:
+            log("  refresh forced (ODDS_FORCE=1)")
         raw_events = {}
         if not fresh_enough and (remaining is None or int(remaining) > cfg["odds_min_remaining"]):
             try:
@@ -569,6 +573,10 @@ def main():
                              "best": [max(p[k] for p in prices) for k in range(3)],
                              "avg": [round(sum(p[k] for p in prices) / n, 3) for k in range(3)],
                              "commence": e["commence_time"]})
+        if not odds and fresh_enough and prev.get("odds"):
+            # not due for a refresh and no raw copy here (a fresh runner): the snapshot's odds are the
+            # current ones, not a fallback after a failure - reuse them without the carried-over flag
+            odds = prev["odds"]
         st.update(events=len(odds), fetchedAt=ometa.get("t") and iso(datetime.fromtimestamp(ometa["t"], timezone.utc)),
                   remaining=remaining, refreshHours=cfg["odds_refresh_hours"])
     else:
