@@ -1,0 +1,7 @@
+# API keys and raw downloads stay on this computer only.
+collector/config.local.json
+collector/cache/
+model-lab/cache/
+old-versions/
+__pycache__/
+_site/
