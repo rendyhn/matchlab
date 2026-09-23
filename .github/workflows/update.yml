@@ -29,7 +29,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
+      # the newest main, not the commit that triggered the run: a run that waited in the queue
+      # would otherwise start from older data and clash with the data commit made before it
       - uses: actions/checkout@v4
+        with:
+          ref: main
 
       # the collector's download cache survives between runs here (never in the repo)
       - name: Restore collector cache
@@ -70,7 +74,9 @@ jobs:
           git add -A data
           if git diff --cached --quiet; then echo "no change"; exit 0; fi
           git commit -m "data: $(date -u '+%Y-%m-%d %H:%M') UTC"
-          git pull --rebase
+          # data/ is written only by this workflow; if someone else's commit touched it meanwhile,
+          # this run's freshly built files win
+          git pull --rebase -X theirs
           git push
 
       - name: Build the site
