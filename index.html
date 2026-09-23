@@ -1,0 +1,2247 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>MatchLab</title>
+<meta name="description" content="Win, draw and loss chances for Europe's football leagues, recomputed from the latest results every time the page opens.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='9' y='1' width='14' height='15' rx='3' fill='%23177A55'/%3E%3Crect x='9' y='17' width='14' height='5' fill='%238A8D85'/%3E%3Crect x='9' y='23' width='14' height='8' rx='3' fill='%232F55C7'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;800&family=Figtree:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* ------------------------------------------------------------------
+   Tokens. Light is the base palette; dark redefines tokens only.
+   1 = home (pitch green), X = draw (chalk grey), 2 = away (kit blue).
+------------------------------------------------------------------- */
+:root {
+  --ground: #F1F4F1;
+  --surface: #FFFFFF;
+  --surface-2: #E8EDE9;
+  --ink: #0F1A16;
+  --muted: #5A6760;
+  --line: #D4DBD6;
+  --home: #177A55;
+  --draw: #8A8D85;
+  --away: #2F55C7;
+  --win: #177A55;
+  --loss: #C4412B;
+  --on-strong: #FFFFFF;
+  --focus: #2F55C7;
+  --shadow: 0 1px 0 rgb(15 26 22 / 0.04), 0 10px 28px -16px rgb(15 26 22 / 0.28);
+  --radius: 14px;
+  --f-display: "Big Shoulders Display", "Arial Narrow", Impact, sans-serif;
+  --f-body: "Figtree", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+  color-scheme: light;
+}
+/* Scripts the Latin faces do not cover: the Latin face stays first (team names are Latin),
+   the script face fills in the glyphs it lacks. */
+:root[lang="zh"] {
+  --f-display: "Big Shoulders Display", "Noto Sans SC", "Microsoft YaHei", "PingFang SC", sans-serif;
+  --f-body: "Figtree", "Noto Sans SC", "Microsoft YaHei", "PingFang SC", system-ui, sans-serif;
+}
+:root[lang="ar"] {
+  --f-display: "Big Shoulders Display", "Noto Kufi Arabic", "IBM Plex Sans Arabic", Tahoma, sans-serif;
+  --f-body: "Figtree", "IBM Plex Sans Arabic", "Segoe UI", Tahoma, sans-serif;
+}
+/* Arabic letters join; any letter-spacing breaks the joins. */
+:root[lang="ar"] body * { letter-spacing: 0 !important; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ground: #0C1311;
+    --surface: #131C19;
+    --surface-2: #1B2622;
+    --ink: #E7EEEA;
+    --muted: #93A099;
+    --line: #26332E;
+    --home: #3BBE8A;
+    --draw: #A4A79F;
+    --away: #7D9BFF;
+    --win: #3BBE8A;
+    --loss: #F0735E;
+    --on-strong: #07100D;
+    --focus: #7D9BFF;
+    --shadow: 0 1px 0 rgb(0 0 0 / 0.3), 0 12px 30px -18px rgb(0 0 0 / 0.7);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --ground: #0C1311;
+  --surface: #131C19;
+  --surface-2: #1B2622;
+  --ink: #E7EEEA;
+  --muted: #93A099;
+  --line: #26332E;
+  --home: #3BBE8A;
+  --draw: #A4A79F;
+  --away: #7D9BFF;
+  --win: #3BBE8A;
+  --loss: #F0735E;
+  --on-strong: #07100D;
+  --focus: #7D9BFF;
+  --shadow: 0 1px 0 rgb(0 0 0 / 0.3), 0 12px 30px -18px rgb(0 0 0 / 0.7);
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--ink);
+  font: 400 15px/1.55 var(--f-body);
+  padding-inline: max(16px, env(safe-area-inset-left, 0px));
+  padding-block: 0 48px;
+}
+[hidden] { display: none !important; }
+.wrap { max-width: 1180px; margin-inline: auto; }
+h1, h2, h3 { margin: 0; text-wrap: balance; }
+p { margin: 0; }
+a { color: var(--away); text-underline-offset: 3px; }
+button, input, select { font: inherit; color: inherit; }
+:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; border-radius: 6px; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.num { font-family: var(--f-mono); font-variant-numeric: tabular-nums; }
+.eyebrow { font: 600 11px/1.2 var(--f-body); letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+
+/* ---------- top bar ---------- */
+.topbar {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+  gap: 14px 24px; padding-block: 22px 18px;
+}
+.brand { display: flex; align-items: center; gap: 14px; min-width: 0; }
+.mark { display: grid; grid-template-rows: 7fr 3fr 4fr; width: 14px; height: 40px; border-radius: 3px; overflow: hidden; flex: none; }
+.mark i:nth-child(1) { background: var(--home); }
+.mark i:nth-child(2) { background: var(--draw); }
+.mark i:nth-child(3) { background: var(--away); }
+.brand h1 { font: 800 34px/0.95 var(--f-display); letter-spacing: 0.01em; text-transform: uppercase; }
+.brand p { color: var(--muted); font-size: 13.5px; max-width: 52ch; margin-top: 4px; }
+.tools { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.status {
+  display: inline-flex; align-items: center; gap: 10px; padding-block: 8px; padding-inline: 12px 14px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 999px;
+  font-size: 13px; color: var(--muted); max-width: 100%;
+}
+.status .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--draw); flex: none; }
+.status.live .dot { background: var(--win); box-shadow: 0 0 0 4px color-mix(in srgb, var(--win) 22%, transparent); }
+.status.bad .dot { background: var(--loss); }
+.status b { color: var(--ink); font-weight: 600; }
+.icon-btn {
+  border: 1px solid var(--line); background: var(--surface); border-radius: 999px;
+  padding: 6px 12px; cursor: pointer; font-size: 13px; color: var(--ink);
+}
+.icon-btn:hover { background: var(--surface-2); }
+.lang {
+  display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); background: var(--surface);
+  border-radius: 999px; padding-block: 2px; padding-inline: 10px 4px; color: var(--muted);
+}
+.lang svg { flex: none; }
+.lang select { border: 0; background: transparent; padding: 4px 4px; font-size: 13px; color: var(--ink); cursor: pointer; max-width: 170px; }
+.lang select:focus { outline: none; }
+.lang:focus-within { outline: 3px solid var(--focus); outline-offset: 2px; }
+
+/* ---------- panels ---------- */
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); }
+section + section { margin-top: 28px; }
+.sec-head { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 10px 20px; margin-bottom: 12px; }
+.sec-head h2 { font: 800 26px/1 var(--f-display); text-transform: uppercase; letter-spacing: 0.01em; }
+.sec-head p { color: var(--muted); font-size: 13.5px; max-width: 64ch; margin-top: 4px; }
+
+/* ---------- picker ---------- */
+.predictor { padding: 18px; }
+.picker { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 10px 12px; align-items: end; }
+.side-label { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.side-label .tag { font: 800 15px/1 var(--f-display); width: 22px; height: 22px; display: grid; place-items: center; border-radius: 5px; color: var(--on-strong); }
+.tag.h { background: var(--home); }
+.tag.a { background: var(--away); }
+.combo { position: relative; min-width: 0; }
+.combo input {
+  width: 100%; padding: 12px 14px; border: 1.5px solid var(--line); border-radius: 10px;
+  background: var(--ground); font-weight: 600; font-size: 16px;
+}
+.combo input:focus { border-color: var(--focus); outline: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus) 25%, transparent); }
+.combo ul {
+  position: absolute; z-index: 20; top: calc(100% + 6px); left: 0; right: 0; max-height: 320px; overflow: auto;
+  margin: 0; padding: 6px; list-style: none; background: var(--surface); border: 1px solid var(--line);
+  border-radius: 12px; box-shadow: var(--shadow);
+}
+.combo li.grp { font: 600 10.5px/1 var(--f-body); letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); padding: 10px 10px 6px; }
+.combo li.opt { padding: 8px 10px; border-radius: 8px; cursor: pointer; display: flex; justify-content: space-between; gap: 10px; }
+.combo li.opt small { color: var(--muted); font-size: 12px; white-space: nowrap; }
+.combo li.opt[aria-selected="true"], .combo li.opt:hover { background: var(--surface-2); }
+.combo li.none { padding: 10px; color: var(--muted); }
+.swap {
+  width: 44px; height: 46px; border-radius: 10px; border: 1.5px solid var(--line); background: var(--surface);
+  cursor: pointer; display: grid; place-items: center; color: var(--muted);
+}
+.swap:hover { color: var(--ink); background: var(--surface-2); }
+.options { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; font-size: 13.5px; color: var(--muted); }
+.toggle { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
+.toggle input { width: 16px; height: 16px; accent-color: var(--home); }
+
+/* ---------- result ---------- */
+.result { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 18px; margin-top: 18px; }
+.card { background: var(--ground); border-radius: 12px; padding: 18px; }
+.verdict { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 6px 18px; }
+.verdict h3 { font: 800 clamp(30px, 5vw, 46px)/0.95 var(--f-display); text-transform: uppercase; letter-spacing: 0.005em; }
+.verdict h3 small { display: block; font: 600 14px/1.3 var(--f-body); text-transform: none; color: var(--muted); letter-spacing: 0; margin-top: 6px; }
+.verdict .big { font: 800 clamp(54px, 9vw, 84px)/0.85 var(--f-display); font-variant-numeric: tabular-nums; }
+.badges { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+.badge { font-size: 12px; padding: 3px 9px; border-radius: 999px; background: var(--surface); border: 1px solid var(--line); color: var(--muted); }
+.badge.warn { border-color: color-mix(in srgb, var(--loss) 45%, var(--line)); color: var(--loss); }
+
+.bar { margin-top: 20px; }
+.bar-track { display: flex; height: 18px; border-radius: 6px; overflow: hidden; margin: 8px 0; background: var(--surface-2); }
+.bar-track > span { display: block; min-width: 2px; transition: flex-basis 0.5s ease; }
+.seg-h { background: var(--home); }
+.seg-x { background: var(--draw); }
+.seg-a { background: var(--away); }
+.outcomes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 4px; }
+.outcome { background: var(--surface); border-radius: 10px; padding: 10px 12px; border-top: 3px solid var(--line); min-width: 0; }
+.outcome.h { border-top-color: var(--home); }
+.outcome.x { border-top-color: var(--draw); }
+.outcome.a { border-top-color: var(--away); }
+.outcome .who { font-size: 12.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.outcome .p { font: 800 30px/1.05 var(--f-display); font-variant-numeric: tabular-nums; }
+.outcome .odds { font-size: 12.5px; color: var(--muted); }
+.outcome .odds b { color: var(--ink); font-family: var(--f-mono); font-weight: 500; }
+
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(118px, 1fr)); gap: 8px; margin-top: 14px; }
+.stat { background: var(--surface); border-radius: 10px; padding: 10px 12px; }
+.stat .k { font-size: 12px; color: var(--muted); }
+.stat .v { font: 500 19px/1.3 var(--f-mono); font-variant-numeric: tabular-nums; }
+
+.grid-wrap { overflow-x: auto; }
+.scoregrid { display: grid; grid-template-columns: 30px repeat(6, minmax(40px, 1fr)); gap: 3px; min-width: 300px; }
+.scoregrid .ax { font: 500 12px/1 var(--f-mono); color: var(--muted); display: grid; place-items: center; min-height: 26px; }
+.scoregrid .cell {
+  aspect-ratio: 1.25; border-radius: 6px; display: grid; place-items: center;
+  font: 500 12.5px/1 var(--f-mono); font-variant-numeric: tabular-nums;
+}
+.scoregrid .cell.best { outline: 2.5px solid var(--ink); outline-offset: -2.5px; }
+.grid-cap { display: flex; justify-content: space-between; gap: 10px; font-size: 12px; color: var(--muted); margin: 10px 0 6px; }
+.toplist { display: grid; grid-template-columns: repeat(auto-fit, minmax(92px, 1fr)); gap: 6px; margin-top: 12px; }
+.toplist div { background: var(--surface); border-radius: 8px; padding: 7px 10px; display: flex; justify-content: space-between; gap: 6px; font-size: 13px; }
+.toplist b { font-family: var(--f-mono); font-weight: 500; }
+
+.teams { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; margin-top: 18px; }
+.team { border-radius: 12px; padding: 16px 18px; border: 1px solid var(--line); background: var(--surface); }
+.team.h { border-inline-start: 5px solid var(--home); }
+.team.a { border-inline-start: 5px solid var(--away); }
+.team h4 { margin: 0; font: 800 26px/1 var(--f-display); text-transform: uppercase; }
+.team .meta { color: var(--muted); font-size: 13px; margin-top: 4px; }
+.rating { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 6px 10px; align-items: center; margin-top: 14px; font-size: 13px; }
+.rating .track { height: 6px; background: var(--surface-2); border-radius: 3px; overflow: hidden; }
+.rating .fill { height: 100%; border-radius: 3px; }
+.rating .n { font-family: var(--f-mono); font-variant-numeric: tabular-nums; }
+.form { display: flex; gap: 5px; margin-top: 14px; flex-wrap: wrap; }
+.chip { min-width: 30px; height: 30px; padding-inline: 6px; border-radius: 6px; display: grid; place-items: center; font: 700 13px/1 var(--f-body); color: var(--on-strong); cursor: default; }
+.chip.w { background: var(--win); }
+.chip.d { background: var(--draw); }
+.chip.l { background: var(--loss); }
+.chip.sm { min-width: 20px; height: 20px; font-size: 11px; border-radius: 4px; padding-inline: 3px; }
+.lastline { font-size: 12.5px; color: var(--muted); margin-top: 8px; }
+.h2h { margin-top: 18px; }
+.h2h table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+.h2h td { padding: 7px 8px; border-top: 1px solid var(--line); }
+.h2h td.sc { text-align: center; font-family: var(--f-mono); white-space: nowrap; }
+.h2h td.dt { color: var(--muted); white-space: nowrap; }
+.h2h td.hm { text-align: end; }
+.empty { color: var(--muted); font-size: 13.5px; padding: 8px 0; }
+
+/* ---------- fixtures ---------- */
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.fchip { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 5px 12px; cursor: pointer; font-size: 13px; }
+.fchip[aria-pressed="true"] { background: var(--ink); color: var(--ground); border-color: var(--ink); }
+.fixtures { padding: 6px 0; }
+.fday { padding: 12px 18px 4px; }
+.frow {
+  display: grid; grid-template-columns: 52px 40px minmax(0, 1fr) minmax(120px, 190px) minmax(0, 1fr);
+  align-items: center; gap: 10px; padding: 9px 18px; border-top: 1px solid var(--line); cursor: pointer;
+  width: 100%; text-align: start; background: none; border-inline: 0; border-bottom: 0; font-size: 14px;
+}
+.frow:hover { background: var(--surface-2); }
+.frow .t { font-family: var(--f-mono); color: var(--muted); font-size: 13px; }
+.frow .lg { font: 600 10.5px/1 var(--f-body); letter-spacing: 0.08em; color: var(--muted); }
+.frow .hn { text-align: end; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.frow .an { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mini { display: flex; flex-direction: column; gap: 4px; }
+.mini .track { display: flex; height: 8px; border-radius: 3px; overflow: hidden; }
+.mini .nums { display: flex; justify-content: space-between; font: 500 11.5px/1 var(--f-mono); color: var(--muted); }
+.mini .nums .fav { color: var(--ink); }
+
+/* ---------- ranking ---------- */
+.table-wrap { overflow-x: auto; }
+table.rank { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 560px; }
+.rank th { text-align: start; font: 600 11px/1.2 var(--f-body); letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); padding: 12px 14px 8px; }
+.rank td { padding: 9px 14px; border-top: 1px solid var(--line); }
+.rank td.r, .rank th.r { text-align: end; }
+.rank td .num { font-size: 13.5px; }
+.rank tr.pick { cursor: pointer; }
+.rank tr.pick:hover td { background: var(--surface-2); }
+.lgtag { font: 600 10.5px/1 var(--f-body); letter-spacing: 0.08em; color: var(--muted); border: 1px solid var(--line); border-radius: 4px; padding: 3px 5px; white-space: nowrap; }
+.gd { display: inline-block; min-width: 54px; text-align: end; }
+.gd.pos { color: var(--win); }
+.gd.neg { color: var(--loss); }
+
+/* ---------- accuracy ---------- */
+.acc { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 18px; padding: 18px; }
+.acc-cards { display: grid; gap: 12px; align-content: start; }
+.acc-card { background: var(--ground); border-radius: 12px; padding: 14px 16px; }
+.acc-card h3 { font: 800 20px/1 var(--f-display); text-transform: uppercase; }
+.acc-card .sub { font-size: 12.5px; color: var(--muted); margin-top: 4px; }
+.kv { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; margin-top: 12px; }
+.kv div { background: var(--surface); border-radius: 8px; padding: 8px 10px; }
+.kv .k { font-size: 11.5px; color: var(--muted); }
+.kv .v { font: 500 18px/1.3 var(--f-mono); font-variant-numeric: tabular-nums; }
+.kv .v small { font-size: 12px; color: var(--muted); }
+.progress { height: 6px; background: var(--surface-2); border-radius: 3px; overflow: hidden; margin-top: 10px; }
+.progress span { display: block; height: 100%; background: var(--home); width: 0; transition: width 0.3s; }
+.chart svg { width: 100%; height: auto; display: block; direction: ltr; }
+.chart .cap { font-size: 12.5px; color: var(--muted); margin-top: 8px; }
+.note { font-size: 13.5px; color: var(--muted); }
+
+/* ---------- method ---------- */
+.method { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 18px; padding: 18px; }
+.method p + p { margin-top: 10px; }
+.method p { max-width: 68ch; }
+.method table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.method td, .method th { padding: 6px 8px; border-top: 1px solid var(--line); text-align: start; }
+.method th { border-top: 0; font: 600 11px/1.2 var(--f-body); letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+.method td.r, .method th.r { text-align: end; }
+
+.loading { padding: 32px 18px; text-align: center; color: var(--muted); }
+.loading .progress { max-width: 320px; margin: 14px auto 0; }
+.error { padding: 24px 18px; }
+.error h3 { font: 800 22px/1.1 var(--f-display); text-transform: uppercase; color: var(--loss); }
+.error p { margin-top: 8px; color: var(--muted); max-width: 64ch; }
+.error button { margin-top: 14px; }
+footer { margin-top: 36px; color: var(--muted); font-size: 12.5px; display: flex; flex-wrap: wrap; gap: 6px 18px; justify-content: space-between; }
+
+/* ---------- market (bookmaker consensus) ---------- */
+.market { margin-top: 14px; background: var(--surface); border-radius: 10px; padding: 10px 12px; border: 1px dashed var(--line); }
+.market .row { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 14px; font-size: 13px; }
+.market .row b { font-family: var(--f-mono); font-weight: 500; }
+.market .track { display: flex; height: 8px; border-radius: 3px; overflow: hidden; margin: 8px 0 6px; opacity: 0.75; }
+.market .diff { font-family: var(--f-mono); font-size: 12px; color: var(--muted); }
+.market .note { font-size: 11.5px; margin-top: 6px; }
+.mkt-line { font: 500 10.5px/1 var(--f-mono); color: var(--muted); margin-top: 2px; }
+
+/* ---------- standings ---------- */
+table.tbl { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 620px; }
+.tbl th { text-align: start; font: 600 11.5px/1.2 var(--f-body); letter-spacing: 0.02em; color: var(--muted); padding: 12px 10px 8px; white-space: nowrap; }   /* no uppercase: keeps "xG" */
+.tbl td { padding: 8px 10px; border-top: 1px solid var(--line); white-space: nowrap; }
+.tbl td.r, .tbl th.r { text-align: end; }
+.tbl td.c, .tbl th.c { text-align: center; }
+.tbl tr.pick { cursor: pointer; }
+.tbl tr.pick:hover td { background: var(--surface-2); }
+.tbl tr.me td { background: color-mix(in srgb, var(--home) 10%, transparent); }
+.tbl .pos { font: 800 16px/1 var(--f-display); font-variant-numeric: tabular-nums; }
+.tbl .pts { font: 800 17px/1 var(--f-display); font-variant-numeric: tabular-nums; }
+.tbl .mdl { font-family: var(--f-mono); font-size: 12.5px; color: var(--muted); }
+.tbl .mdl.up { color: var(--win); }
+.tbl .mdl.down { color: var(--loss); }
+.tbl-foot { padding: 10px 14px; font-size: 12.5px; color: var(--muted); border-top: 1px solid var(--line); }
+
+/* ---------- sources ---------- */
+.src { width: 100%; border-collapse: collapse; font-size: 13px; }
+.src td, .src th { padding: 7px 8px; border-top: 1px solid var(--line); text-align: start; vertical-align: top; }
+.src th { border-top: 0; font: 600 11px/1.2 var(--f-body); letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+.pill { display: inline-block; font-size: 11.5px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); white-space: nowrap; }
+.pill.ok { color: var(--win); border-color: color-mix(in srgb, var(--win) 45%, var(--line)); }
+.pill.err { color: var(--loss); border-color: color-mix(in srgb, var(--loss) 45%, var(--line)); }
+.conflicts { margin: 8px 0 0; padding-inline-start: 18px; font-size: 12.5px; color: var(--muted); }
+
+@media (max-width: 900px) {
+  .result, .acc, .method { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 640px) {
+  .picker { grid-template-columns: minmax(0, 1fr) auto; }
+  .picker .combo-away-wrap { grid-column: 1 / 2; }
+  .picker .swap { grid-row: 1 / 3; grid-column: 2; align-self: center; }
+  .teams { grid-template-columns: minmax(0, 1fr); }
+  .frow { grid-template-columns: 44px minmax(0, 1fr) minmax(0, 1fr); grid-template-areas: "t hn an" "lg mini mini"; row-gap: 6px; }
+  .frow .t { grid-area: t; }
+  .frow .lg { grid-area: lg; }
+  .frow .hn { grid-area: hn; text-align: start; }
+  .frow .an { grid-area: an; text-align: end; }
+  .frow .mini { grid-area: mini; }
+  .outcome .p { font-size: 26px; }
+  .brand h1 { font-size: 30px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="topbar">
+    <div class="brand">
+      <div class="mark" aria-hidden="true"><i></i><i></i><i></i></div>
+      <div>
+        <h1>MatchLab</h1>
+        <p data-i18n="tagline"></p>
+      </div>
+    </div>
+    <div class="tools">
+      <div class="status" id="status" role="status"><span class="dot"></span><span id="status-text"></span></div>
+      <button class="icon-btn" id="reload" type="button" data-i18n="reload" data-i18n-title="reloadTitle"></button>
+      <label class="lang">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.6 2.8 3.9 5.8 3.9 9s-1.3 6.2-3.9 9c-2.6-2.8-3.9-5.8-3.9-9S9.4 5.8 12 3z"/></svg>
+        <span class="sr-only" data-i18n="langLabel"></span>
+        <select id="lang"></select>
+      </label>
+    </div>
+  </header>
+
+  <main>
+    <section class="panel predictor" aria-labelledby="pred-title">
+      <h2 id="pred-title" class="sr-only" data-i18n="predTitle"></h2>
+      <div class="picker">
+        <div class="combo-home-wrap">
+          <div class="side-label"><span class="tag h">1</span><label for="in-home" class="eyebrow" data-i18n="home"></label></div>
+          <div class="combo" id="combo-home">
+            <input id="in-home" type="text" dir="auto" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="list-home" autocomplete="off" spellcheck="false" data-i18n-ph="search" disabled>
+            <ul id="list-home" role="listbox" hidden></ul>
+          </div>
+        </div>
+        <button class="swap" id="swap" type="button" data-i18n-title="swap" data-i18n-aria="swap" disabled>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 7h13l-4-4M17 17H4l4 4"/></svg>
+        </button>
+        <div class="combo-away-wrap">
+          <div class="side-label"><span class="tag a">2</span><label for="in-away" class="eyebrow" data-i18n="away"></label></div>
+          <div class="combo" id="combo-away">
+            <input id="in-away" type="text" dir="auto" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="list-away" autocomplete="off" spellcheck="false" data-i18n-ph="search" disabled>
+            <ul id="list-away" role="listbox" hidden></ul>
+          </div>
+        </div>
+        <div class="options">
+          <label class="toggle"><input type="checkbox" id="neutral"> <span data-i18n="neutral"></span></label>
+          <span id="pick-hint"></span>
+        </div>
+      </div>
+      <div id="result">
+        <div class="loading" id="loading">
+          <div id="loading-text"></div>
+          <div class="progress"><span id="loading-bar"></span></div>
+        </div>
+      </div>
+    </section>
+
+    <section aria-labelledby="tbl-title" id="tbl-sec" hidden>
+      <div class="sec-head">
+        <div>
+          <h2 id="tbl-title" data-i18n="tblTitle"></h2>
+          <p id="tbl-sub"></p>
+        </div>
+        <div class="chips" id="tbl-filter" role="group" data-i18n-aria="filterAria"></div>
+      </div>
+      <div class="panel table-wrap" id="tbl"></div>
+    </section>
+
+    <section aria-labelledby="fix-title" id="fixtures-sec" hidden>
+      <div class="sec-head">
+        <div>
+          <h2 id="fix-title" data-i18n="fixTitle"></h2>
+          <p id="fix-sub"></p>
+        </div>
+        <div class="chips" id="fix-filter" role="group" data-i18n-aria="filterAria"></div>
+      </div>
+      <div class="panel fixtures" id="fixtures"></div>
+    </section>
+
+    <section aria-labelledby="rank-title" id="rank-sec" hidden>
+      <div class="sec-head">
+        <div>
+          <h2 id="rank-title" data-i18n="rankTitle3"></h2>
+          <p data-i18n="rankSub"></p>
+        </div>
+        <div class="chips" id="rank-filter" role="group" data-i18n-aria="filterAria"></div>
+      </div>
+      <div class="panel table-wrap"><table class="rank" id="rank-table"></table></div>
+    </section>
+
+    <section aria-labelledby="acc-title" id="acc-sec" hidden>
+      <div class="sec-head">
+        <div>
+          <h2 id="acc-title" data-i18n="accTitle"></h2>
+          <p data-i18n="accSub"></p>
+        </div>
+      </div>
+      <div class="panel acc" id="acc"></div>
+    </section>
+
+    <section aria-labelledby="method-title" id="method-sec" hidden>
+      <div class="sec-head"><div><h2 id="method-title" data-i18n="methodTitle"></h2></div></div>
+      <div class="panel method" id="method"></div>
+    </section>
+  </main>
+
+  <footer>
+    <span id="foot-data"></span>
+    <span><span data-i18n="footNote"></span> · v5</span>
+  </footer>
+</div>
+
+<script>
+'use strict';
+
+/* ==================================================================
+   TRANSLATIONS
+   {name} is replaced by a value. Keys marked in the code as HTML keep
+   their <b> tags; every value inserted into them is escaped.
+   ================================================================== */
+const LANGS = [
+  { code: 'en', label: 'English' },
+  { code: 'es', label: 'Español' },
+  { code: 'zh', label: '中文（简体）' },
+  { code: 'fr', label: 'Français' },
+  { code: 'de', label: 'Deutsch' },
+  { code: 'ar', label: 'العربية' },
+  { code: 'id', label: 'Bahasa Indonesia' },
+];
+const LOCALE = { en: 'en-GB', es: 'es-ES', zh: 'zh-CN', fr: 'fr-FR', de: 'de-DE', ar: 'ar-u-nu-latn', id: 'id-ID' };
+const FONTS = {
+  zh: 'https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&display=swap',
+  ar: 'https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600&family=Noto+Kufi+Arabic:wght@700;800&display=swap',
+};
+
+const I18N = {
+en: {
+  tagline: 'Win, draw and loss chances for Europe’s leagues. The model retrains on the latest results every time this page opens.',
+  langLabel: 'Language', reload: 'Refresh', reloadTitle: 'Fetch the latest data again and retrain the model',
+  stLoading: 'Loading data…', stLive: 'Data to <b>{date}</b> · {n} matches · trained in {ms} ms', stBad: 'Data unavailable',
+  predTitle: 'Match prediction', home: 'Home', away: 'Away', search: 'Search team…', swap: 'Swap home and away',
+  neutral: 'Neutral venue (no home advantage)', hintStart: 'Type a team name, then pick it from the list.',
+  hintOdds: 'Fair odds = 1 ÷ probability, with no bookmaker margin. Based on {n} matches, older ones weighing less.',
+  noMatch: 'No team matches. Try another spelling, for example without accents.',
+  ldFetch: 'Fetching the latest results…', ldFetchN: 'Fetching the latest results… {d}/{n} files', ldTrain: 'Training the model on {n} matches…',
+  errTitle: 'Match data could not be fetched',
+  errBody: 'This page fetches the latest results from GitHub (openfootball) every time it opens. Check your internet connection and try again. If the page is opened from a file on your computer and still fails, open it in an up-to-date Chrome or Edge.',
+  retry: 'Try again', pickTwo: 'Pick two different teams.', pickBoth: 'Pick a home and an away team.',
+  favHome: 'favoured to win at home', favNeutral: 'favoured to win at a neutral venue', favAway: 'favoured to win away',
+  draw: 'Draw', drawSym: 'X', drawLikely: 'the most likely result',
+  crossLeague: 'Cross-league · lower confidence',
+  crossLeagueTip: 'Strength across leagues is estimated from Champions League results and promoted or relegated clubs — far less data than domestic matches.',
+  homeAdv: 'Home advantage in {league}: +{x}% goals', fewData: 'Little data for {team}: {n} matches in the last year',
+  fewDataTip: 'Teams with few recorded matches (for example just promoted from a league with incomplete data) get a rougher rating.',
+  barAria: '{h} win {ph}, draw {pd}, {a} win {pa}', winOf: '{team} win', fairOdds: 'fair odds',
+  xg: 'Expected goals (xG)', over25: 'Over 2.5 goals', btts: 'Both teams score', cleanSheet: 'Clean sheet {h} · {a}',
+  scoreTitle: 'Final score chances', goalsHome: '↓ {team} goals', goalsAway: '{team} goals →', gridAria: 'Score probability grid, 0 to 5 goals',
+  teamMeta: '{league} · model rank <b>#{lr}</b> in league, <b>#{r}</b> of {n} teams', attack: 'Attack', conceded: 'Conceded', goals: '{x} goals',
+  formAria: 'Last five matches, most recent first', noMatches: 'No matches yet', homeWord: 'home', awayWord: 'away',
+  chipTitle: '{date} · {comp} · {venue} vs {opp} {score}', vsHome: 'vs', vsAway: 'at',
+  last: 'Last: {vs} {opp} {score} · {date} · {comp}', h2hTitle: 'Recent meetings in the data (since {season})',
+  h2hNone: 'They have not met in the last three recorded seasons.', ucl: 'Champions League', fW: 'W', fD: 'D', fL: 'L', scoreSep: '–',
+  fixTitle: 'Upcoming matches',
+  fixSubWeek: 'Unplayed matches in the next 7 days. Click a match for the details. Kick-off times as in the source (local time).',
+  fixSubNext: 'No matches in the next 7 days; these are the next ones. Kick-off times as in the source (local time).',
+  filterAria: 'Filter by league', all: 'All', fixRowAria: '{h} v {a}: {ph}, draw {pd}, {pa}', fixNone: 'No scheduled matches for this league in the data.',
+  rankTitle: 'Power ranking',
+  rankSub: 'Expected goals per match against an average top-flight European team at a neutral venue. Higher attack and lower conceded means stronger.',
+  thTeam: 'Team', thLeague: 'League', thAttack: 'Attack', thConceded: 'Conceded', thDiff: 'Difference', thForm: 'Last 5',
+  rankRowTitle: 'Click to use {team} in the prediction',
+  accTitle: 'How accurate is it?',
+  accSub: 'Tested the way it is actually used: each week the model is trained only on matches before that week, then predicts that week’s matches. Recomputed in your browser from the latest data.',
+  season: 'Season {s}', accCurSub: 'In progress · never seen when the model settings were chosen', accPrevSub: 'A full season · used to choose the model settings',
+  waiting: 'Waiting…', testing: 'Testing…', accMeta: '{n} matches · {s} s', accNone: 'No matches to test yet.',
+  accTop: 'Top pick correct', accHome: 'Always picking the home team', accLL: 'Model log-loss', accBase: 'Baseline log-loss',
+  accBaseNote: '1/X/2 frequencies', accGain: 'Better than baseline',
+  calib: 'Calibration', calibWait: 'The chart appears when testing finishes.', calibTitle: 'Calibration · {n} matches, three probabilities each',
+  calibDot: 'Predicted {p}, happened {q} ({n} probabilities)', calibAxis: 'model probability',
+  calibAria: 'Calibration chart: predicted probability against observed frequency',
+  calibCap: 'Dots on the dashed line mean honest numbers: when the model says 40%, it happens about 40% of the time. Vertical axis = how often the outcome actually happened; dot size = number of predictions.',
+  methodTitle: 'How it works, and its limits',
+  m1: '<b>Model.</b> Each team has two numbers: attacking and defensive strength. Each side’s goals in a match are treated as Poisson-distributed, with a mean built from those two numbers plus the home advantage of its league. The Dixon-Coles correction (ρ = {rho}) adjusts low scores such as 0–0 and 1–1, which happen more often than a plain Poisson guess.',
+  m2: '<b>Recent data weighs more.</b> A match’s weight halves every {hl} days, so last week’s form counts far more than last season’s. The model is retrained from scratch every time the page opens, on {n} matches from three seasons, including second divisions (history for promoted clubs) and {cups} Champions League matches.',
+  m3: '<b>Across leagues.</b> Team strengths are pulled toward their league’s average. The gap between leagues can only be learned from cross-league matches: the Champions League and clubs moving up or down a division. That data is thin, so cross-league predictions are rougher than domestic ones.',
+  m4: '<b>What the model does not know.</b> It reads final scores only. It knows nothing about injuries, suspensions, rotation, fixture congestion, coaching changes, weather or motivation. The fair odds here carry no bookmaker margin; bookmakers who read all of that are usually sharper. Treat these numbers as a starting point, not a certainty.',
+  freshTitle: 'Data freshness, season {s}', thPlayed: 'Played', thScheduled: 'Scheduled', thLast: 'Latest result',
+  freshNote: 'The source is updated by openfootball volunteers, usually one to three days after a match.',
+  failedFiles: '{n} files could not be fetched on this load.',
+  footData: 'Data: {link}, fetched live every time the page opens.', footNote: 'A statistical model, not a guaranteed result.',
+  stLive3: 'Data to <b>{date}</b> · {n} matches · {src} sources · trained in {ms} ms', grpUcl: 'Champions League (other clubs)',
+  tblTitle: 'League table',
+  tblSubOfficial: 'Official table from football-data.org (point deductions included), next to the model’s strength rank. They answer different questions: points collected so far, and how strong a team really is.',
+  tblSubComputed: 'Computed from the results. Run the data collector to show the official table.',
+  thMP: 'MP', thGoals: 'Goals', thGD: 'GD', thPts: 'Pts', thXgd: 'xG diff', thModel: 'Model #',
+  thXgdTip: 'Expected-goals difference per match this season (Understat). Above the goal difference: a team has been unlucky; below it: lucky.',
+  thModelTip: 'The model’s strength rank within the league — not the table position.',
+  teamTable: 'Table: <b>#{pos}</b> · {pts} pts', teamXg: 'xG per match this season: {f} – {a}',
+  mktTitle: 'Market · average of {n} bookmakers', mktBest: 'best odds',
+  mktNote: 'Market probabilities with the bookmaker margin removed. A big gap to the model usually means news the model cannot see (injuries, rotation).',
+  mktShort: 'market', mktDiff: 'model − market',
+  srcTitle: 'Data sources', thSource: 'Source', thStatus: 'Status', thFresh: 'Latest data', thNote: 'Note',
+  stOk: 'OK', stErr: 'Failed', stOff: 'Not used', stOld: 'Old copy',
+  srcNoSnap: 'No extra data yet. Run update-data.bat in the app folder to add football-data.org, Understat, OpenLigaDB and bookmaker odds.',
+  srcAge: 'Extra data built {ago}.', srcBase: 'Main source · {n} matches',
+  srcFd: '{n} extra results incl. Champions League, {f} upcoming Champions League matches, official tables',
+  srcXg: 'xG for {n} matches (top-5 leagues)', srcOl: 'Bundesliga cross-check · {n} matches',
+  srcOdds: '{n} matches · {r} credits left · refreshed every {h} h',
+  confNone: 'Scores agree across all sources.', confSome: '{n} scores differ between sources:', snapStale: 'Extra data last built {ago}',
+  rankTitle3: 'Power ranking (model)',
+  m5: '<b>xG and the Champions League.</b> In the top-5 leagues the model learns from a blend of {w} expected goals (xG, Understat) and {g} real goals, and it adds the last two Champions League seasons from football-data.org. Tested the same walk-forward way over two full seasons, the log-loss improved by {p1} (2024/25) and {p2} (2025/26); over the first weeks of 2026/27 the difference is still within noise.',
+},
+es: {
+  tagline: 'Probabilidades de victoria, empate y derrota en las ligas europeas. El modelo se reentrena con los últimos resultados cada vez que se abre esta página.',
+  langLabel: 'Idioma', reload: 'Actualizar', reloadTitle: 'Volver a descargar los datos más recientes y reentrenar el modelo',
+  stLoading: 'Cargando datos…', stLive: 'Datos hasta el <b>{date}</b> · {n} partidos · entrenado en {ms} ms', stBad: 'Datos no disponibles',
+  predTitle: 'Predicción del partido', home: 'Local', away: 'Visitante', search: 'Buscar equipo…', swap: 'Intercambiar local y visitante',
+  neutral: 'Campo neutral (sin ventaja de local)', hintStart: 'Escribe el nombre de un equipo y elígelo de la lista.',
+  hintOdds: 'Cuota justa = 1 ÷ probabilidad, sin margen de la casa de apuestas. Calculado con {n} partidos; los más antiguos pesan menos.',
+  noMatch: 'Ningún equipo coincide. Prueba otra grafía, por ejemplo sin acentos.',
+  ldFetch: 'Descargando los últimos resultados…', ldFetchN: 'Descargando los últimos resultados… {d}/{n} archivos', ldTrain: 'Entrenando el modelo con {n} partidos…',
+  errTitle: 'No se pudieron obtener los datos',
+  errBody: 'Esta página descarga los últimos resultados de GitHub (openfootball) cada vez que se abre. Revisa tu conexión a internet y vuelve a intentarlo. Si abres la página desde un archivo de tu ordenador y sigue fallando, ábrela con Chrome o Edge actualizados.',
+  retry: 'Reintentar', pickTwo: 'Elige dos equipos distintos.', pickBoth: 'Elige un equipo local y uno visitante.',
+  favHome: 'favorito para ganar en casa', favNeutral: 'favorito para ganar en campo neutral', favAway: 'favorito para ganar a domicilio',
+  draw: 'Empate', drawSym: 'X', drawLikely: 'el resultado más probable',
+  crossLeague: 'Entre ligas · menor confianza',
+  crossLeagueTip: 'La fuerza entre ligas se estima con resultados de la Liga de Campeones y clubes ascendidos o descendidos: muchos menos datos que los partidos de liga.',
+  homeAdv: 'Ventaja de local en {league}: +{x} % goles', fewData: 'Pocos datos de {team}: {n} partidos en el último año',
+  fewDataTip: 'Los equipos con pocos partidos registrados (por ejemplo, recién ascendidos desde una liga con datos incompletos) tienen una valoración menos precisa.',
+  barAria: 'Gana {h} {ph}, empate {pd}, gana {a} {pa}', winOf: 'Gana {team}', fairOdds: 'cuota justa',
+  xg: 'Goles esperados (xG)', over25: 'Más de 2,5 goles', btts: 'Ambos marcan', cleanSheet: 'Portería a cero {h} · {a}',
+  scoreTitle: 'Probabilidad del resultado final', goalsHome: '↓ goles de {team}', goalsAway: 'goles de {team} →', gridAria: 'Cuadrícula de probabilidades de resultado, de 0 a 5 goles',
+  teamMeta: '{league} · puesto del modelo <b>#{lr}</b> en la liga, <b>#{r}</b> de {n} equipos', attack: 'Ataque', conceded: 'Encajados', goals: '{x} goles',
+  formAria: 'Últimos cinco partidos, el más reciente primero', noMatches: 'Aún sin partidos', homeWord: 'local', awayWord: 'visitante',
+  chipTitle: '{date} · {comp} · {venue} ante {opp} {score}', vsHome: 'ante', vsAway: 'en casa de',
+  last: 'Último: {vs} {opp} {score} · {date} · {comp}', h2hTitle: 'Enfrentamientos recientes en los datos (desde {season})',
+  h2hNone: 'No se han enfrentado en las tres últimas temporadas registradas.', ucl: 'Liga de Campeones', fW: 'G', fD: 'E', fL: 'P', scoreSep: '–',
+  fixTitle: 'Próximos partidos',
+  fixSubWeek: 'Partidos sin jugar en los próximos 7 días. Haz clic en uno para ver el detalle. Horarios según la fuente (hora local).',
+  fixSubNext: 'No hay partidos en los próximos 7 días; estos son los siguientes. Horarios según la fuente (hora local).',
+  filterAria: 'Filtrar por liga', all: 'Todas', fixRowAria: '{h} contra {a}: {ph}, empate {pd}, {pa}', fixNone: 'No hay partidos programados de esta liga en los datos.',
+  rankTitle: 'Ranking de fuerza',
+  rankSub: 'Goles esperados por partido contra un equipo medio de las grandes ligas europeas en campo neutral. Más ataque y menos goles encajados significa más fuerte.',
+  thTeam: 'Equipo', thLeague: 'Liga', thAttack: 'Ataque', thConceded: 'Encajados', thDiff: 'Diferencia', thForm: 'Últimos 5',
+  rankRowTitle: 'Haz clic para usar a {team} en la predicción',
+  accTitle: '¿Qué tan preciso es?',
+  accSub: 'Probado tal como se usa de verdad: cada semana el modelo se entrena solo con los partidos anteriores a esa semana y luego predice los de esa semana. Se recalcula en tu navegador con los datos más recientes.',
+  season: 'Temporada {s}', accCurSub: 'En curso · nunca vista al elegir los ajustes del modelo', accPrevSub: 'Temporada completa · usada para elegir los ajustes del modelo',
+  waiting: 'En espera…', testing: 'Probando…', accMeta: '{n} partidos · {s} s', accNone: 'Aún no hay partidos para probar.',
+  accTop: 'Pronóstico principal acertado', accHome: 'Si siempre eliges al local', accLL: 'Log-loss del modelo', accBase: 'Log-loss de referencia',
+  accBaseNote: 'frecuencias 1/X/2', accGain: 'Mejor que la referencia',
+  calib: 'Calibración', calibWait: 'El gráfico aparece cuando termina la prueba.', calibTitle: 'Calibración · {n} partidos, tres probabilidades por partido',
+  calibDot: 'Predicho {p}, ocurrió {q} ({n} probabilidades)', calibAxis: 'probabilidad del modelo',
+  calibAria: 'Gráfico de calibración: probabilidad predicha frente a frecuencia observada',
+  calibCap: 'Los puntos sobre la línea discontinua significan cifras honestas: si el modelo dice 40 %, ocurre cerca del 40 % de las veces. Eje vertical = con qué frecuencia ocurrió de verdad; tamaño del punto = número de predicciones.',
+  methodTitle: 'Cómo funciona y sus límites',
+  m1: '<b>Modelo.</b> Cada equipo tiene dos números: fuerza atacante y defensiva. Los goles de cada equipo en un partido siguen una distribución de Poisson, con una media construida a partir de esos dos números más la ventaja de local de su liga. La corrección de Dixon-Coles (ρ = {rho}) ajusta los marcadores bajos como 0–0 y 1–1, más frecuentes de lo que predice un Poisson simple.',
+  m2: '<b>Los datos recientes pesan más.</b> El peso de un partido se reduce a la mitad cada {hl} días, así que la forma de la semana pasada cuenta mucho más que la de la temporada pasada. El modelo se reentrena desde cero cada vez que se abre la página, con {n} partidos de tres temporadas, incluidas las segundas divisiones (historial de los ascendidos) y {cups} partidos de la Liga de Campeones.',
+  m3: '<b>Entre ligas.</b> La fuerza de cada equipo se acerca a la media de su liga. La diferencia de nivel entre ligas solo se aprende de partidos entre ligas: la Liga de Campeones y los clubes que suben o bajan de categoría. Son pocos datos, así que las predicciones entre ligas son menos precisas que las de liga.',
+  m4: '<b>Lo que el modelo no sabe.</b> Solo lee marcadores finales. No sabe nada de lesiones, sanciones, rotaciones, calendario apretado, cambios de entrenador, clima ni motivación. Las cuotas justas no incluyen el margen de la casa; las casas de apuestas, que leen todo eso, suelen afinar más. Usa estas cifras como punto de partida, no como certeza.',
+  freshTitle: 'Actualidad de los datos, temporada {s}', thPlayed: 'Jugados', thScheduled: 'Programados', thLast: 'Último resultado',
+  freshNote: 'Voluntarios de openfootball actualizan la fuente, normalmente de uno a tres días después de cada partido.',
+  failedFiles: 'No se pudieron descargar {n} archivos en esta carga.',
+  footData: 'Datos: {link}, descargados en vivo cada vez que se abre la página.', footNote: 'Un modelo estadístico, no un resultado garantizado.',
+  stLive3: 'Datos hasta el <b>{date}</b> · {n} partidos · {src} fuentes · entrenado en {ms} ms', grpUcl: 'Liga de Campeones (otros clubes)',
+  tblTitle: 'Clasificación',
+  tblSubOfficial: 'Clasificación oficial de football-data.org (incluye sanciones de puntos), junto al ranking de fuerza del modelo. Responden a preguntas distintas: los puntos sumados y lo fuerte que es de verdad un equipo.',
+  tblSubComputed: 'Calculada a partir de los resultados. Ejecuta el recolector de datos para ver la clasificación oficial.',
+  thMP: 'PJ', thGoals: 'Goles', thGD: 'DG', thPts: 'Pts', thXgd: 'Dif. xG', thModel: 'Modelo #',
+  thXgdTip: 'Diferencia de goles esperados (xG) por partido esta temporada (Understat). Por encima de la diferencia de goles: el equipo ha tenido mala suerte; por debajo: buena suerte.',
+  thModelTip: 'Puesto de fuerza según el modelo dentro de la liga, no la posición en la tabla.',
+  teamTable: 'Clasificación: <b>#{pos}</b> · {pts} pts', teamXg: 'xG por partido esta temporada: {f} – {a}',
+  mktTitle: 'Mercado · media de {n} casas de apuestas', mktBest: 'mejor cuota',
+  mktNote: 'Probabilidades del mercado sin el margen de la casa. Una gran diferencia con el modelo suele indicar noticias que el modelo no ve (lesiones, rotaciones).',
+  mktShort: 'mercado', mktDiff: 'modelo − mercado',
+  srcTitle: 'Fuentes de datos', thSource: 'Fuente', thStatus: 'Estado', thFresh: 'Dato más reciente', thNote: 'Nota',
+  stOk: 'OK', stErr: 'Error', stOff: 'Sin usar', stOld: 'Copia antigua',
+  srcNoSnap: 'Aún no hay datos adicionales. Ejecuta update-data.bat en la carpeta de la aplicación para añadir football-data.org, Understat, OpenLigaDB y las cuotas.',
+  srcAge: 'Datos adicionales generados {ago}.', srcBase: 'Fuente principal · {n} partidos',
+  srcFd: '{n} resultados adicionales, incl. Liga de Campeones; {f} partidos de Liga de Campeones programados; clasificaciones oficiales',
+  srcXg: 'xG de {n} partidos (5 grandes ligas)', srcOl: 'Contraste de la Bundesliga · {n} partidos',
+  srcOdds: '{n} partidos · quedan {r} créditos · se actualiza cada {h} h',
+  confNone: 'Los marcadores coinciden en todas las fuentes.', confSome: '{n} marcadores difieren entre fuentes:', snapStale: 'Datos adicionales generados {ago}',
+  rankTitle3: 'Ranking de fuerza (modelo)',
+  m5: '<b>xG y Liga de Campeones.</b> En las 5 grandes ligas el modelo aprende de una mezcla de {w} de goles esperados (xG, Understat) y {g} de goles reales, y añade las dos últimas temporadas de la Liga de Campeones (football-data.org). Probado del mismo modo en dos temporadas completas, el log-loss mejoró un {p1} (2024/25) y un {p2} (2025/26); en las primeras semanas de 2026/27 la diferencia aún está dentro del ruido.',
+},
+zh: {
+  tagline: '欧洲各联赛的胜、平、负概率。每次打开本页面，模型都会用最新赛果重新训练。',
+  langLabel: '语言', reload: '刷新', reloadTitle: '重新获取最新数据并重新训练模型',
+  stLoading: '正在加载数据…', stLive: '数据截至 <b>{date}</b> · {n} 场比赛 · 训练用时 {ms} 毫秒', stBad: '无法获取数据',
+  predTitle: '比赛预测', home: '主队', away: '客队', search: '搜索球队…', swap: '交换主客队',
+  neutral: '中立场地（无主场优势）', hintStart: '输入球队名称（英文），然后从列表中选择。',
+  hintOdds: '公平赔率 = 1 ÷ 概率，不含博彩公司抽水。基于 {n} 场比赛计算，越早的比赛权重越低。',
+  noMatch: '没有匹配的球队。请尝试其他拼写，例如去掉重音符号。',
+  ldFetch: '正在获取最新赛果…', ldFetchN: '正在获取最新赛果… {d}/{n} 个文件', ldTrain: '正在用 {n} 场比赛训练模型…',
+  errTitle: '无法获取比赛数据',
+  errBody: '本页面每次打开时都会从 GitHub（openfootball）获取最新赛果。请检查网络连接后重试。如果从电脑上的文件打开仍然失败，请使用最新版 Chrome 或 Edge 打开。',
+  retry: '重试', pickTwo: '请选择两支不同的球队。', pickBoth: '请选择主队和客队。',
+  favHome: '主场获胜的热门', favNeutral: '中立场地获胜的热门', favAway: '客场获胜的热门',
+  draw: '平局', drawSym: 'X', drawLikely: '最可能的结果',
+  crossLeague: '跨联赛 · 可信度较低',
+  crossLeagueTip: '跨联赛实力根据欧冠结果及升降级球队估算，数据远少于联赛内比赛。',
+  homeAdv: '{league}主场优势：进球 +{x}%', fewData: '{team}数据较少：近一年 {n} 场',
+  fewDataTip: '记录比赛较少的球队（例如刚从数据不完整的联赛升级）评分较粗略。',
+  barAria: '{h}胜 {ph}，平局 {pd}，{a}胜 {pa}', winOf: '{team}胜', fairOdds: '公平赔率',
+  xg: '预期进球 (xG)', over25: '总进球大于 2.5', btts: '双方均有进球', cleanSheet: '零封 {h} · {a}',
+  scoreTitle: '最终比分概率', goalsHome: '↓ {team} 进球', goalsAway: '{team} 进球 →', gridAria: '比分概率表，0 至 5 球',
+  teamMeta: '{league} · 模型排名：联赛第 <b>{lr}</b>，{n} 队中第 <b>{r}</b>', attack: '进攻', conceded: '失球', goals: '{x} 球',
+  formAria: '最近五场，最新的在前', noMatches: '暂无比赛', homeWord: '主场', awayWord: '客场',
+  chipTitle: '{date} · {comp} · {venue}对 {opp} {score}', vsHome: '主场对', vsAway: '客场对',
+  last: '上一场：{vs} {opp} {score} · {date} · {comp}', h2hTitle: '数据中的近期交锋（自 {season} 起）',
+  h2hNone: '最近三个有记录的赛季中未曾交手。', ucl: '欧冠', fW: '胜', fD: '平', fL: '负', scoreSep: '–',
+  fixTitle: '近期赛程',
+  fixSubWeek: '未来 7 天内尚未进行的比赛。点击比赛查看详情。开球时间以数据源为准（当地时间）。',
+  fixSubNext: '未来 7 天没有比赛；以下是接下来的比赛。开球时间以数据源为准（当地时间）。',
+  filterAria: '按联赛筛选', all: '全部', fixRowAria: '{h} 对 {a}：{ph}，平局 {pd}，{pa}', fixNone: '数据中没有该联赛的已排期比赛。',
+  rankTitle: '实力排名',
+  rankSub: '在中立场地面对欧洲顶级联赛平均水平球队时，每场的预期进球与失球。进攻越高、失球越低，实力越强。',
+  thTeam: '球队', thLeague: '联赛', thAttack: '进攻', thConceded: '失球', thDiff: '净胜', thForm: '近 5 场',
+  rankRowTitle: '点击在预测中使用{team}',
+  accTitle: '准确度如何？',
+  accSub: '按真实使用方式测试：每周只用该周之前的比赛训练模型，再预测该周的比赛。在你的浏览器中用最新数据重新计算。',
+  season: '{s} 赛季', accCurSub: '进行中 · 选择模型参数时从未使用', accPrevSub: '完整赛季 · 用于选择模型参数',
+  waiting: '等待中…', testing: '测试中…', accMeta: '{n} 场比赛 · {s} 秒', accNone: '暂无可测试的比赛。',
+  accTop: '首选预测命中', accHome: '若总是选主队', accLL: '模型 log-loss', accBase: '基准 log-loss',
+  accBaseNote: '胜平负频率', accGain: '优于基准',
+  calib: '校准', calibWait: '测试完成后显示图表。', calibTitle: '校准 · {n} 场比赛，每场三个概率',
+  calibDot: '预测 {p}，实际发生 {q}（{n} 个概率）', calibAxis: '模型概率',
+  calibAria: '校准图：预测概率与实际发生频率对比',
+  calibCap: '点落在虚线上代表数字诚实：模型说 40%，实际也大约有 40% 的时候发生。纵轴 = 结果实际发生的频率；点的大小 = 预测数量。',
+  methodTitle: '工作原理与局限',
+  m1: '<b>模型。</b>每支球队有两个数值：进攻实力和防守实力。一场比赛中每队的进球数服从泊松分布，其均值由这两个数值加上所在联赛的主场优势决定。Dixon-Coles 修正（ρ = {rho}）调整 0–0、1–1 等低比分，这类比分比纯泊松模型预期的更常见。',
+  m2: '<b>近期数据权重更高。</b>一场比赛的权重每 {hl} 天减半，因此上周的状态远比上赛季重要。每次打开页面，模型都从零开始重新训练，使用三个赛季的 {n} 场比赛，包括次级联赛（升班马的历史）和 {cups} 场欧冠比赛。',
+  m3: '<b>跨联赛。</b>球队实力会向其联赛平均水平收缩。联赛之间的水平差距只能从跨联赛比赛中学习：欧冠以及升降级球队。这类数据很少，因此跨联赛预测比联赛内预测更粗略。',
+  m4: '<b>模型不知道的事。</b>模型只读取最终比分，不了解伤病、停赛、轮换、密集赛程、换帅、天气或战意。这里的公平赔率不含抽水；掌握这些信息的博彩公司通常更准确。请把这些数字当作起点，而非定论。',
+  freshTitle: '{s} 赛季数据新鲜度', thPlayed: '已赛', thScheduled: '待赛', thLast: '最近赛果',
+  freshNote: '数据源由 openfootball 志愿者更新，通常在比赛后一到三天内。',
+  failedFiles: '本次加载有 {n} 个文件获取失败。',
+  footData: '数据：{link}，每次打开页面时实时获取。', footNote: '统计模型，不保证结果。',
+  stLive3: '数据截至 <b>{date}</b> · {n} 场比赛 · {src} 个来源 · 训练用时 {ms} 毫秒', grpUcl: '欧冠（其他球队）',
+  tblTitle: '积分榜',
+  tblSubOfficial: '来自 football-data.org 的官方积分榜（已计入扣分），并列显示模型实力排名。两者回答不同的问题：已拿到的积分，以及球队的真实实力。',
+  tblSubComputed: '根据比赛结果计算。运行数据收集器即可显示官方积分榜。',
+  thMP: '场', thGoals: '进/失', thGD: '净胜', thPts: '积分', thXgd: 'xG 差', thModel: '模型 #',
+  thXgdTip: '本赛季场均预期进球差（Understat）。高于净胜球：运气欠佳；低于净胜球：运气较好。',
+  thModelTip: '模型在联赛内的实力排名，并非积分榜名次。',
+  teamTable: '积分榜：第 <b>{pos}</b> · {pts} 分', teamXg: '本赛季场均 xG：{f} – {a}',
+  mktTitle: '市场 · {n} 家博彩公司平均', mktBest: '最高赔率',
+  mktNote: '去除抽水后的市场概率。与模型相差较大，通常意味着模型看不到的消息（伤病、轮换）。',
+  mktShort: '市场', mktDiff: '模型 − 市场',
+  srcTitle: '数据来源', thSource: '来源', thStatus: '状态', thFresh: '最新数据', thNote: '说明',
+  stOk: '正常', stErr: '失败', stOff: '未使用', stOld: '旧副本',
+  srcNoSnap: '尚无附加数据。在应用文件夹中运行 update-data.bat，即可加入 football-data.org、Understat、OpenLigaDB 和博彩赔率。',
+  srcAge: '附加数据生成于{ago}。', srcBase: '主要来源 · {n} 场比赛',
+  srcFd: '{n} 条附加赛果（含欧冠）、{f} 场已排期欧冠比赛、官方积分榜',
+  srcXg: '{n} 场比赛的 xG（五大联赛）', srcOl: '德甲交叉核对 · {n} 场比赛',
+  srcOdds: '{n} 场比赛 · 剩余额度 {r} · 每 {h} 小时更新',
+  confNone: '所有来源的比分一致。', confSome: '{n} 个比分在不同来源之间不一致：', snapStale: '附加数据最后生成于{ago}',
+  rankTitle3: '实力排名（模型）',
+  m5: '<b>xG 与欧冠。</b>在五大联赛中，模型学习的是 {w} 预期进球（xG，Understat）与 {g} 实际进球的混合，并加入最近两个赛季的欧冠比赛（football-data.org）。以同样的逐周方式在两个完整赛季上检验，log-loss 分别改善 {p1}（2024/25）和 {p2}（2025/26）；2026/27 赛季前几周的差异仍在随机波动范围内。',
+  leagues: { 'en.1': '英超', 'es.1': '西甲', 'de.1': '德甲', 'it.1': '意甲', 'fr.1': '法甲', 'nl.1': '荷甲', 'pt.1': '葡超', 'en.2': '英冠' },
+},
+fr: {
+  tagline: 'Chances de victoire, de nul et de défaite dans les championnats européens. Le modèle se réentraîne sur les derniers résultats à chaque ouverture de la page.',
+  langLabel: 'Langue', reload: 'Actualiser', reloadTitle: 'Retélécharger les données les plus récentes et réentraîner le modèle',
+  stLoading: 'Chargement des données…', stLive: 'Données jusqu’au <b>{date}</b> · {n} matchs · entraîné en {ms} ms', stBad: 'Données indisponibles',
+  predTitle: 'Prédiction du match', home: 'Domicile', away: 'Extérieur', search: 'Rechercher une équipe…', swap: 'Inverser domicile et extérieur',
+  neutral: 'Terrain neutre (sans avantage du terrain)', hintStart: 'Tapez le nom d’une équipe, puis choisissez-la dans la liste.',
+  hintOdds: 'Cote juste = 1 ÷ probabilité, sans marge du bookmaker. Calculé sur {n} matchs, les plus anciens pesant moins.',
+  noMatch: 'Aucune équipe ne correspond. Essayez une autre orthographe, par exemple sans accents.',
+  ldFetch: 'Récupération des derniers résultats…', ldFetchN: 'Récupération des derniers résultats… {d}/{n} fichiers', ldTrain: 'Entraînement du modèle sur {n} matchs…',
+  errTitle: 'Impossible de récupérer les données',
+  errBody: 'Cette page récupère les derniers résultats sur GitHub (openfootball) à chaque ouverture. Vérifiez votre connexion internet, puis réessayez. Si la page est ouverte depuis un fichier de votre ordinateur et échoue encore, ouvrez-la dans Chrome ou Edge à jour.',
+  retry: 'Réessayer', pickTwo: 'Choisissez deux équipes différentes.', pickBoth: 'Choisissez une équipe à domicile et une à l’extérieur.',
+  favHome: 'favori pour gagner à domicile', favNeutral: 'favori pour gagner sur terrain neutre', favAway: 'favori pour gagner à l’extérieur',
+  draw: 'Nul', drawSym: 'N', drawLikely: 'le résultat le plus probable',
+  crossLeague: 'Entre championnats · confiance moindre',
+  crossLeagueTip: 'La force entre championnats est estimée à partir de la Ligue des champions et des clubs promus ou relégués : bien moins de données que pour les matchs nationaux.',
+  homeAdv: 'Avantage du terrain en {league} : +{x} % de buts', fewData: 'Peu de données pour {team} : {n} matchs sur la dernière année',
+  fewDataTip: 'Les équipes avec peu de matchs enregistrés (par exemple tout juste promues d’un championnat aux données incomplètes) reçoivent une évaluation plus grossière.',
+  barAria: 'Victoire {h} {ph}, nul {pd}, victoire {a} {pa}', winOf: 'Victoire {team}', fairOdds: 'cote juste',
+  xg: 'Buts attendus (xG)', over25: 'Plus de 2,5 buts', btts: 'Les deux équipes marquent', cleanSheet: 'Cage inviolée {h} · {a}',
+  scoreTitle: 'Chances du score final', goalsHome: '↓ buts {team}', goalsAway: 'buts {team} →', gridAria: 'Grille des probabilités de score, de 0 à 5 buts',
+  teamMeta: '{league} · rang du modèle <b>#{lr}</b> dans le championnat, <b>#{r}</b> sur {n} équipes', attack: 'Attaque', conceded: 'Encaissés', goals: '{x} buts',
+  formAria: 'Cinq derniers matchs, le plus récent d’abord', noMatches: 'Aucun match pour l’instant', homeWord: 'domicile', awayWord: 'extérieur',
+  chipTitle: '{date} · {comp} · {venue} contre {opp} {score}', vsHome: 'contre', vsAway: 'à',
+  last: 'Dernier : {vs} {opp} {score} · {date} · {comp}', h2hTitle: 'Confrontations récentes dans les données (depuis {season})',
+  h2hNone: 'Aucune confrontation lors des trois dernières saisons enregistrées.', ucl: 'Ligue des champions', fW: 'V', fD: 'N', fL: 'D', scoreSep: '–',
+  fixTitle: 'Prochains matchs',
+  fixSubWeek: 'Matchs non joués dans les 7 prochains jours. Cliquez sur un match pour le détail. Horaires de la source (heure locale).',
+  fixSubNext: 'Aucun match dans les 7 prochains jours ; voici les suivants. Horaires de la source (heure locale).',
+  filterAria: 'Filtrer par championnat', all: 'Tous', fixRowAria: '{h} contre {a} : {ph}, nul {pd}, {pa}', fixNone: 'Aucun match programmé pour ce championnat dans les données.',
+  rankTitle: 'Classement de force',
+  rankSub: 'Buts attendus par match contre une équipe moyenne des grands championnats européens, sur terrain neutre. Plus d’attaque et moins de buts encaissés signifie plus fort.',
+  thTeam: 'Équipe', thLeague: 'Championnat', thAttack: 'Attaque', thConceded: 'Encaissés', thDiff: 'Différence', thForm: '5 derniers',
+  rankRowTitle: 'Cliquez pour utiliser {team} dans la prédiction',
+  accTitle: 'Quelle précision ?',
+  accSub: 'Testé comme en situation réelle : chaque semaine, le modèle n’est entraîné que sur les matchs antérieurs à cette semaine, puis prédit ceux de la semaine. Recalculé dans votre navigateur à partir des données les plus récentes.',
+  season: 'Saison {s}', accCurSub: 'En cours · jamais vue lors du choix des réglages du modèle', accPrevSub: 'Saison complète · utilisée pour choisir les réglages du modèle',
+  waiting: 'En attente…', testing: 'Test en cours…', accMeta: '{n} matchs · {s} s', accNone: 'Pas encore de matchs à tester.',
+  accTop: 'Premier choix correct', accHome: 'En choisissant toujours le domicile', accLL: 'Log-loss du modèle', accBase: 'Log-loss de référence',
+  accBaseNote: 'fréquences 1/N/2', accGain: 'Mieux que la référence',
+  calib: 'Calibration', calibWait: 'Le graphique apparaît à la fin du test.', calibTitle: 'Calibration · {n} matchs, trois probabilités par match',
+  calibDot: 'Prévu {p}, survenu {q} ({n} probabilités)', calibAxis: 'probabilité du modèle',
+  calibAria: 'Graphique de calibration : probabilité prévue contre fréquence observée',
+  calibCap: 'Des points sur la ligne pointillée signifient des chiffres honnêtes : quand le modèle dit 40 %, cela arrive environ 40 % du temps. Axe vertical = fréquence réelle du résultat ; taille du point = nombre de prédictions.',
+  methodTitle: 'Fonctionnement et limites',
+  m1: '<b>Modèle.</b> Chaque équipe a deux nombres : force offensive et force défensive. Les buts de chaque équipe dans un match suivent une loi de Poisson dont la moyenne vient de ces deux nombres et de l’avantage du terrain de son championnat. La correction de Dixon-Coles (ρ = {rho}) ajuste les petits scores comme 0–0 et 1–1, plus fréquents que ne le prévoit un Poisson simple.',
+  m2: '<b>Les données récentes pèsent plus.</b> Le poids d’un match est divisé par deux tous les {hl} jours : la forme de la semaine dernière compte bien plus que celle de la saison dernière. Le modèle est réentraîné de zéro à chaque ouverture de la page, sur {n} matchs de trois saisons, dont les deuxièmes divisions (historique des promus) et {cups} matchs de Ligue des champions.',
+  m3: '<b>Entre championnats.</b> La force d’une équipe est tirée vers la moyenne de son championnat. L’écart de niveau entre championnats ne s’apprend qu’avec des matchs entre championnats : la Ligue des champions et les clubs qui montent ou descendent. Ces données sont rares, donc les prédictions entre championnats sont plus grossières.',
+  m4: '<b>Ce que le modèle ignore.</b> Il ne lit que les scores finaux. Il ignore les blessures, suspensions, rotations, calendriers chargés, changements d’entraîneur, la météo et la motivation. Les cotes justes n’incluent aucune marge ; les bookmakers, qui tiennent compte de tout cela, sont en général plus précis. Prenez ces chiffres comme un point de départ, pas une certitude.',
+  freshTitle: 'Fraîcheur des données, saison {s}', thPlayed: 'Joués', thScheduled: 'Programmés', thLast: 'Dernier résultat',
+  freshNote: 'La source est mise à jour par des bénévoles d’openfootball, en général un à trois jours après chaque match.',
+  failedFiles: '{n} fichiers n’ont pas pu être récupérés lors de ce chargement.',
+  footData: 'Données : {link}, récupérées en direct à chaque ouverture de la page.', footNote: 'Un modèle statistique, pas un résultat garanti.',
+  stLive3: 'Données jusqu’au <b>{date}</b> · {n} matchs · {src} sources · entraîné en {ms} ms', grpUcl: 'Ligue des champions (autres clubs)',
+  tblTitle: 'Classement',
+  tblSubOfficial: 'Classement officiel de football-data.org (pénalités de points comprises), à côté du rang de force du modèle. Les deux répondent à des questions différentes : les points déjà pris, et la force réelle d’une équipe.',
+  tblSubComputed: 'Calculé à partir des résultats. Lancez le collecteur de données pour afficher le classement officiel.',
+  thMP: 'J', thGoals: 'Buts', thGD: 'Diff.', thPts: 'Pts', thXgd: 'Diff. xG', thModel: 'Modèle #',
+  thXgdTip: 'Différence de buts attendus (xG) par match cette saison (Understat). Au-dessus de la différence de buts : l’équipe a été malchanceuse ; en dessous : chanceuse.',
+  thModelTip: 'Rang de force du modèle dans le championnat, pas la place au classement.',
+  teamTable: 'Classement : <b>#{pos}</b> · {pts} pts', teamXg: 'xG par match cette saison : {f} – {a}',
+  mktTitle: 'Marché · moyenne de {n} bookmakers', mktBest: 'meilleure cote',
+  mktNote: 'Probabilités du marché, marge du bookmaker retirée. Un grand écart avec le modèle signale souvent une information qu’il ne voit pas (blessures, rotation).',
+  mktShort: 'marché', mktDiff: 'modèle − marché',
+  srcTitle: 'Sources de données', thSource: 'Source', thStatus: 'État', thFresh: 'Donnée la plus récente', thNote: 'Remarque',
+  stOk: 'OK', stErr: 'Échec', stOff: 'Non utilisée', stOld: 'Ancienne copie',
+  srcNoSnap: 'Pas encore de données supplémentaires. Lancez update-data.bat dans le dossier de l’application pour ajouter football-data.org, Understat, OpenLigaDB et les cotes.',
+  srcAge: 'Données supplémentaires générées {ago}.', srcBase: 'Source principale · {n} matchs',
+  srcFd: '{n} résultats supplémentaires dont la Ligue des champions, {f} matchs de Ligue des champions à venir, classements officiels',
+  srcXg: 'xG de {n} matchs (5 grands championnats)', srcOl: 'Contrôle de la Bundesliga · {n} matchs',
+  srcOdds: '{n} matchs · {r} crédits restants · actualisé toutes les {h} h',
+  confNone: 'Les scores concordent entre toutes les sources.', confSome: '{n} scores diffèrent entre les sources :', snapStale: 'Données supplémentaires générées {ago}',
+  rankTitle3: 'Classement de force (modèle)',
+  m5: '<b>xG et Ligue des champions.</b> Dans les 5 grands championnats, le modèle apprend d’un mélange de {w} de buts attendus (xG, Understat) et {g} de buts réels, et ajoute les deux dernières saisons de Ligue des champions (football-data.org). Testé de la même façon sur deux saisons complètes, le log-loss s’améliore de {p1} (2024/25) et de {p2} (2025/26) ; sur les premières semaines de 2026/27, l’écart reste dans le bruit.',
+},
+de: {
+  tagline: 'Sieg-, Remis- und Niederlagenchancen für Europas Ligen. Das Modell lernt bei jedem Öffnen der Seite neu aus den aktuellsten Ergebnissen.',
+  langLabel: 'Sprache', reload: 'Aktualisieren', reloadTitle: 'Neueste Daten erneut laden und das Modell neu trainieren',
+  stLoading: 'Daten werden geladen…', stLive: 'Daten bis <b>{date}</b> · {n} Spiele · trainiert in {ms} ms', stBad: 'Daten nicht verfügbar',
+  predTitle: 'Spielprognose', home: 'Heim', away: 'Auswärts', search: 'Team suchen…', swap: 'Heim und Auswärts tauschen',
+  neutral: 'Neutraler Platz (ohne Heimvorteil)', hintStart: 'Teamnamen eintippen und aus der Liste wählen.',
+  hintOdds: 'Faire Quote = 1 ÷ Wahrscheinlichkeit, ohne Buchmacher-Marge. Berechnet aus {n} Spielen; ältere zählen weniger.',
+  noMatch: 'Kein passendes Team. Andere Schreibweise versuchen, z. B. ohne Umlaute oder Akzente.',
+  ldFetch: 'Neueste Ergebnisse werden geladen…', ldFetchN: 'Neueste Ergebnisse werden geladen… {d}/{n} Dateien', ldTrain: 'Modell wird mit {n} Spielen trainiert…',
+  errTitle: 'Spieldaten konnten nicht geladen werden',
+  errBody: 'Diese Seite lädt bei jedem Öffnen die neuesten Ergebnisse von GitHub (openfootball). Prüfen Sie Ihre Internetverbindung und versuchen Sie es erneut. Wenn die Seite als Datei vom Computer geöffnet wird und weiterhin scheitert, öffnen Sie sie in einem aktuellen Chrome oder Edge.',
+  retry: 'Erneut versuchen', pickTwo: 'Zwei verschiedene Teams wählen.', pickBoth: 'Heim- und Auswärtsteam wählen.',
+  favHome: 'Favorit auf den Heimsieg', favNeutral: 'Favorit auf den Sieg auf neutralem Platz', favAway: 'Favorit auf den Auswärtssieg',
+  draw: 'Remis', drawSym: 'X', drawLikely: 'das wahrscheinlichste Ergebnis',
+  crossLeague: 'Ligaübergreifend · geringere Sicherheit',
+  crossLeagueTip: 'Die Stärke über Ligen hinweg wird aus Champions-League-Ergebnissen sowie Auf- und Absteigern geschätzt – weit weniger Daten als bei Ligaspielen.',
+  homeAdv: 'Heimvorteil {league}: +{x} % Tore', fewData: 'Wenig Daten zu {team}: {n} Spiele im letzten Jahr',
+  fewDataTip: 'Teams mit wenigen erfassten Spielen (etwa frisch aufgestiegen aus einer Liga mit lückenhaften Daten) werden gröber bewertet.',
+  barAria: 'Sieg {h} {ph}, Remis {pd}, Sieg {a} {pa}', winOf: 'Sieg {team}', fairOdds: 'faire Quote',
+  xg: 'Erwartete Tore (xG)', over25: 'Über 2,5 Tore', btts: 'Beide Teams treffen', cleanSheet: 'Zu null {h} · {a}',
+  scoreTitle: 'Wahrscheinlichkeit des Endstands', goalsHome: '↓ Tore {team}', goalsAway: 'Tore {team} →', gridAria: 'Raster der Ergebniswahrscheinlichkeiten, 0 bis 5 Tore',
+  teamMeta: '{league} · Modellrang <b>#{lr}</b> in der Liga, <b>#{r}</b> von {n} Teams', attack: 'Angriff', conceded: 'Gegentore', goals: '{x} Tore',
+  formAria: 'Letzte fünf Spiele, das neueste zuerst', noMatches: 'Noch keine Spiele', homeWord: 'Heimspiel', awayWord: 'Auswärtsspiel',
+  chipTitle: '{date} · {comp} · {venue} gegen {opp} {score}', vsHome: 'gegen', vsAway: 'bei',
+  last: 'Zuletzt: {vs} {opp} {score} · {date} · {comp}', h2hTitle: 'Letzte Duelle in den Daten (seit {season})',
+  h2hNone: 'In den letzten drei erfassten Saisons kein Duell.', ucl: 'Champions League', fW: 'S', fD: 'U', fL: 'N', scoreSep: ':',
+  fixTitle: 'Nächste Spiele',
+  fixSubWeek: 'Ungespielte Partien der nächsten 7 Tage. Für Details auf ein Spiel klicken. Anstoßzeiten laut Quelle (Ortszeit).',
+  fixSubNext: 'In den nächsten 7 Tagen keine Spiele; hier die nächsten. Anstoßzeiten laut Quelle (Ortszeit).',
+  filterAria: 'Nach Liga filtern', all: 'Alle', fixRowAria: '{h} gegen {a}: {ph}, Remis {pd}, {pa}', fixNone: 'Für diese Liga sind keine Spiele in den Daten angesetzt.',
+  rankTitle: 'Stärke-Ranking',
+  rankSub: 'Erwartete Tore pro Spiel gegen ein durchschnittliches Team der europäischen Topligen auf neutralem Platz. Mehr Angriff und weniger Gegentore bedeuten stärker.',
+  thTeam: 'Team', thLeague: 'Liga', thAttack: 'Angriff', thConceded: 'Gegentore', thDiff: 'Differenz', thForm: 'Letzte 5',
+  rankRowTitle: 'Klicken, um {team} in der Prognose zu verwenden',
+  accTitle: 'Wie genau ist es?',
+  accSub: 'Getestet wie im echten Einsatz: Jede Woche wird das Modell nur mit Spielen vor dieser Woche trainiert und sagt dann die Spiele dieser Woche voraus. In Ihrem Browser aus den neuesten Daten neu berechnet.',
+  season: 'Saison {s}', accCurSub: 'Laufend · bei der Wahl der Modelleinstellungen nie gesehen', accPrevSub: 'Ganze Saison · zur Wahl der Modelleinstellungen genutzt',
+  waiting: 'Wartet…', testing: 'Wird getestet…', accMeta: '{n} Spiele · {s} s', accNone: 'Noch keine Spiele zum Testen.',
+  accTop: 'Top-Tipp richtig', accHome: 'Immer auf das Heimteam tippen', accLL: 'Log-Loss des Modells', accBase: 'Log-Loss der Referenz',
+  accBaseNote: '1/X/2-Häufigkeiten', accGain: 'Besser als die Referenz',
+  calib: 'Kalibrierung', calibWait: 'Das Diagramm erscheint nach Abschluss des Tests.', calibTitle: 'Kalibrierung · {n} Spiele, drei Wahrscheinlichkeiten pro Spiel',
+  calibDot: 'Vorhergesagt {p}, eingetreten {q} ({n} Wahrscheinlichkeiten)', calibAxis: 'Modellwahrscheinlichkeit',
+  calibAria: 'Kalibrierungsdiagramm: vorhergesagte Wahrscheinlichkeit gegen beobachtete Häufigkeit',
+  calibCap: 'Punkte auf der gestrichelten Linie bedeuten ehrliche Zahlen: Sagt das Modell 40 %, tritt es etwa in 40 % der Fälle ein. Senkrechte Achse = wie oft das Ergebnis tatsächlich eintrat; Punktgröße = Anzahl der Prognosen.',
+  methodTitle: 'So funktioniert es – und seine Grenzen',
+  m1: '<b>Modell.</b> Jedes Team hat zwei Zahlen: Angriffs- und Abwehrstärke. Die Tore jedes Teams in einem Spiel folgen einer Poisson-Verteilung, deren Mittelwert aus diesen beiden Zahlen und dem Heimvorteil seiner Liga entsteht. Die Dixon-Coles-Korrektur (ρ = {rho}) passt niedrige Ergebnisse wie 0:0 und 1:1 an, die häufiger vorkommen, als ein reines Poisson-Modell erwartet.',
+  m2: '<b>Neuere Daten zählen mehr.</b> Das Gewicht eines Spiels halbiert sich alle {hl} Tage, die Form der letzten Woche zählt also weit mehr als die der letzten Saison. Das Modell wird bei jedem Öffnen der Seite von Grund auf neu trainiert, mit {n} Spielen aus drei Saisons, einschließlich der zweiten Ligen (Vorgeschichte der Aufsteiger) und {cups} Champions-League-Spielen.',
+  m3: '<b>Ligaübergreifend.</b> Die Teamstärken werden zum Durchschnitt ihrer Liga hingezogen. Den Niveauunterschied zwischen Ligen lernt das Modell nur aus ligaübergreifenden Spielen: der Champions League sowie Auf- und Absteigern. Diese Daten sind dünn, daher sind ligaübergreifende Prognosen gröber als nationale.',
+  m4: '<b>Was das Modell nicht weiß.</b> Es liest nur Endergebnisse. Es weiß nichts von Verletzungen, Sperren, Rotation, engem Spielplan, Trainerwechseln, Wetter oder Motivation. Die fairen Quoten enthalten keine Marge; Buchmacher, die all das einbeziehen, liegen meist genauer. Nutzen Sie diese Zahlen als Ausgangspunkt, nicht als Gewissheit.',
+  freshTitle: 'Aktualität der Daten, Saison {s}', thPlayed: 'Gespielt', thScheduled: 'Angesetzt', thLast: 'Letztes Ergebnis',
+  freshNote: 'Die Quelle wird von Freiwilligen bei openfootball gepflegt, meist ein bis drei Tage nach dem Spiel.',
+  failedFiles: '{n} Dateien konnten bei diesem Laden nicht abgerufen werden.',
+  footData: 'Daten: {link}, bei jedem Öffnen der Seite live abgerufen.', footNote: 'Ein statistisches Modell, kein garantiertes Ergebnis.',
+  stLive3: 'Daten bis <b>{date}</b> · {n} Spiele · {src} Quellen · trainiert in {ms} ms', grpUcl: 'Champions League (weitere Klubs)',
+  tblTitle: 'Tabelle',
+  tblSubOfficial: 'Offizielle Tabelle von football-data.org (inklusive Punktabzügen), neben dem Stärkerang des Modells. Beide beantworten verschiedene Fragen: die bisher gesammelten Punkte und wie stark ein Team wirklich ist.',
+  tblSubComputed: 'Aus den Ergebnissen berechnet. Starten Sie den Datensammler, um die offizielle Tabelle anzuzeigen.',
+  thMP: 'Sp.', thGoals: 'Tore', thGD: 'Diff.', thPts: 'Pkt.', thXgd: 'xG-Diff.', thModel: 'Modell #',
+  thXgdTip: 'Differenz der erwarteten Tore (xG) pro Spiel in dieser Saison (Understat). Über der Tordifferenz: Das Team hatte Pech; darunter: Glück.',
+  thModelTip: 'Stärkerang des Modells innerhalb der Liga – nicht der Tabellenplatz.',
+  teamTable: 'Tabelle: <b>#{pos}</b> · {pts} Pkt.', teamXg: 'xG pro Spiel in dieser Saison: {f} – {a}',
+  mktTitle: 'Markt · Durchschnitt von {n} Buchmachern', mktBest: 'beste Quote',
+  mktNote: 'Marktwahrscheinlichkeiten ohne Buchmacher-Marge. Eine große Abweichung vom Modell deutet meist auf Informationen hin, die das Modell nicht sieht (Verletzungen, Rotation).',
+  mktShort: 'Markt', mktDiff: 'Modell − Markt',
+  srcTitle: 'Datenquellen', thSource: 'Quelle', thStatus: 'Status', thFresh: 'Neueste Daten', thNote: 'Hinweis',
+  stOk: 'OK', stErr: 'Fehler', stOff: 'Nicht genutzt', stOld: 'Alte Kopie',
+  srcNoSnap: 'Noch keine Zusatzdaten. Starten Sie update-data.bat im Anwendungsordner, um football-data.org, Understat, OpenLigaDB und Buchmacherquoten hinzuzufügen.',
+  srcAge: 'Zusatzdaten erstellt {ago}.', srcBase: 'Hauptquelle · {n} Spiele',
+  srcFd: '{n} zusätzliche Ergebnisse inkl. Champions League, {f} angesetzte Champions-League-Spiele, offizielle Tabellen',
+  srcXg: 'xG für {n} Spiele (Top-5-Ligen)', srcOl: 'Bundesliga-Gegenprüfung · {n} Spiele',
+  srcOdds: '{n} Spiele · {r} Credits übrig · Aktualisierung alle {h} Std.',
+  confNone: 'Die Ergebnisse stimmen in allen Quellen überein.', confSome: '{n} Ergebnisse weichen zwischen den Quellen ab:', snapStale: 'Zusatzdaten zuletzt erstellt {ago}',
+  rankTitle3: 'Stärke-Ranking (Modell)',
+  m5: '<b>xG und Champions League.</b> In den Top-5-Ligen lernt das Modell aus einer Mischung von {w} erwarteten Toren (xG, Understat) und {g} echten Toren und nimmt die letzten beiden Champions-League-Saisons hinzu (football-data.org). Auf dieselbe Weise über zwei ganze Saisons getestet, verbessert sich der Log-Loss um {p1} (2024/25) und {p2} (2025/26); in den ersten Wochen von 2026/27 liegt der Unterschied noch im Rauschen.',
+},
+ar: {
+  tagline: 'احتمالات الفوز والتعادل والخسارة في الدوريات الأوروبية. يُعاد تدريب النموذج على أحدث النتائج في كل مرة تُفتح فيها هذه الصفحة.',
+  langLabel: 'اللغة', reload: 'تحديث', reloadTitle: 'إعادة جلب أحدث البيانات وإعادة تدريب النموذج',
+  stLoading: 'جارٍ تحميل البيانات…', stLive: 'البيانات حتى <b>{date}</b> · {n} مباراة · التدريب في {ms} مللي ثانية', stBad: 'تعذّر جلب البيانات',
+  predTitle: 'توقّع المباراة', home: 'صاحب الأرض', away: 'الضيف', search: 'ابحث عن فريق…', swap: 'تبديل صاحب الأرض والضيف',
+  neutral: 'ملعب محايد (دون أفضلية الأرض)', hintStart: 'اكتب اسم الفريق بالأحرف اللاتينية ثم اختره من القائمة.',
+  hintOdds: 'المعامل العادل = 1 ÷ الاحتمال، دون هامش شركة المراهنات. محسوب من {n} مباراة، والمباريات الأقدم وزنها أقل.',
+  noMatch: 'لا يوجد فريق مطابق. جرّب تهجئة أخرى.',
+  ldFetch: 'جارٍ جلب أحدث النتائج…', ldFetchN: 'جارٍ جلب أحدث النتائج… {d}/{n} ملف', ldTrain: 'جارٍ تدريب النموذج على {n} مباراة…',
+  errTitle: 'تعذّر جلب بيانات المباريات',
+  errBody: 'تجلب هذه الصفحة أحدث النتائج من GitHub (openfootball) في كل مرة تُفتح فيها. تحقّق من اتصالك بالإنترنت ثم أعد المحاولة. إذا فُتحت الصفحة من ملف على جهازك واستمر الفشل، فافتحها بأحدث إصدار من Chrome أو Edge.',
+  retry: 'إعادة المحاولة', pickTwo: 'اختر فريقين مختلفين.', pickBoth: 'اختر صاحب الأرض والضيف.',
+  favHome: 'مرشّح للفوز على أرضه', favNeutral: 'مرشّح للفوز في ملعب محايد', favAway: 'مرشّح للفوز خارج أرضه',
+  draw: 'تعادل', drawSym: 'X', drawLikely: 'النتيجة الأرجح',
+  crossLeague: 'بين دوريين · ثقة أقل',
+  crossLeagueTip: 'تُقدَّر القوة بين الدوريات من نتائج دوري أبطال أوروبا والأندية الصاعدة والهابطة، وهي بيانات أقل بكثير من مباريات الدوري.',
+  homeAdv: 'أفضلية الأرض في {league}: أهداف أكثر بنسبة {x}%', fewData: 'بيانات قليلة عن {team}: {n} مباراة في العام الأخير',
+  fewDataTip: 'الفرق ذات المباريات المسجّلة القليلة (مثل الصاعدة حديثاً من دوري بياناته ناقصة) تحصل على تقييم أقل دقة.',
+  barAria: 'فوز {h} {ph}، تعادل {pd}، فوز {a} {pa}', winOf: 'فوز {team}', fairOdds: 'المعامل العادل',
+  xg: 'الأهداف المتوقعة (xG)', over25: 'أكثر من 2.5 هدف', btts: 'كلا الفريقين يسجّل', cleanSheet: 'شباك نظيفة {h} · {a}',
+  scoreTitle: 'احتمالات النتيجة النهائية', goalsHome: '↓ أهداف {team}', goalsAway: 'أهداف {team} ←', gridAria: 'جدول احتمالات النتيجة من 0 إلى 5 أهداف',
+  teamMeta: '{league} · ترتيب النموذج <b>{lr}</b> في الدوري، و<b>{r}</b> من {n} فريقاً', attack: 'الهجوم', conceded: 'الأهداف المستقبَلة', goals: '{x} هدف',
+  formAria: 'آخر خمس مباريات، الأحدث أولاً', noMatches: 'لا مباريات بعد', homeWord: 'على أرضه', awayWord: 'خارج أرضه',
+  chipTitle: '{date} · {comp} · {venue} ضد {opp} {score}', vsHome: 'ضد', vsAway: 'في ضيافة',
+  last: 'الأخيرة: {vs} {opp} {score} · {date} · {comp}', h2hTitle: 'آخر المواجهات في البيانات (منذ {season})',
+  h2hNone: 'لم يلتقيا في آخر ثلاثة مواسم مسجّلة.', ucl: 'دوري أبطال أوروبا', fW: 'ف', fD: 'ت', fL: 'خ', scoreSep: '–',
+  fixTitle: 'المباريات القادمة',
+  fixSubWeek: 'مباريات لم تُلعب بعد خلال الأيام السبعة القادمة. اضغط على مباراة لعرض التفاصيل. التوقيت حسب المصدر (بالتوقيت المحلي).',
+  fixSubNext: 'لا مباريات خلال الأيام السبعة القادمة؛ هذه هي المباريات التالية. التوقيت حسب المصدر (بالتوقيت المحلي).',
+  filterAria: 'تصفية حسب الدوري', all: 'الكل', fixRowAria: '{h} ضد {a}: {ph}، تعادل {pd}، {pa}', fixNone: 'لا توجد مباريات مجدولة لهذا الدوري في البيانات.',
+  rankTitle: 'ترتيب القوة',
+  rankSub: 'الأهداف المتوقعة في المباراة أمام فريق متوسط من الدوريات الأوروبية الكبرى في ملعب محايد. كلما ارتفع الهجوم وقلّت الأهداف المستقبَلة كان الفريق أقوى.',
+  thTeam: 'الفريق', thLeague: 'الدوري', thAttack: 'الهجوم', thConceded: 'المستقبَلة', thDiff: 'الفارق', thForm: 'آخر 5',
+  rankRowTitle: 'اضغط لاستخدام {team} في التوقّع',
+  accTitle: 'ما مدى الدقة؟',
+  accSub: 'اختُبر بالطريقة نفسها التي يُستخدم بها فعلاً: كل أسبوع يُدرَّب النموذج على المباريات السابقة لذلك الأسبوع فقط، ثم يتوقّع مباريات الأسبوع. يُعاد الحساب في متصفحك من أحدث البيانات.',
+  season: 'موسم {s}', accCurSub: 'جارٍ · لم يُستخدم عند اختيار إعدادات النموذج', accPrevSub: 'موسم كامل · استُخدم لاختيار إعدادات النموذج',
+  waiting: 'بانتظار الدور…', testing: 'جارٍ الاختبار…', accMeta: '{n} مباراة · {s} ث', accNone: 'لا توجد مباريات للاختبار بعد.',
+  accTop: 'صحة الاختيار الأول', accHome: 'لو اخترت صاحب الأرض دائماً', accLL: 'log-loss النموذج', accBase: 'log-loss المرجع',
+  accBaseNote: 'تكرارات 1/X/2', accGain: 'أفضل من المرجع',
+  calib: 'المعايرة', calibWait: 'يظهر الرسم بعد انتهاء الاختبار.', calibTitle: 'المعايرة · {n} مباراة، ثلاثة احتمالات لكل مباراة',
+  calibDot: 'المتوقَّع {p}، الحاصل {q} ({n} احتمال)', calibAxis: 'احتمال النموذج',
+  calibAria: 'رسم المعايرة: الاحتمال المتوقَّع مقابل التكرار الفعلي',
+  calibCap: 'النقاط على الخط المتقطع تعني أرقاماً صادقة: إذا قال النموذج 40%، يحدث ذلك في نحو 40% من المرات. المحور العمودي = مدى تكرار النتيجة فعلاً؛ حجم النقطة = عدد التوقّعات.',
+  methodTitle: 'طريقة العمل وحدودها',
+  m1: '<b>النموذج.</b> لكل فريق رقمان: قوة الهجوم وقوة الدفاع. تُعامَل أهداف كل فريق في المباراة كتوزيع بواسون، متوسطه مبني على هذين الرقمين مع أفضلية الأرض في دوريه. يضبط تصحيح ديكسون-كولز (ρ = {rho}) النتائج المنخفضة مثل 0–0 و1–1، التي تتكرر أكثر مما يتوقعه بواسون البسيط.',
+  m2: '<b>البيانات الأحدث أثقل وزناً.</b> ينخفض وزن المباراة إلى النصف كل {hl} يوماً، فأداء الأسبوع الماضي أهم بكثير من أداء الموسم الماضي. يُعاد تدريب النموذج من الصفر في كل مرة تُفتح فيها الصفحة، على {n} مباراة من ثلاثة مواسم، تشمل الدرجة الثانية (تاريخ الأندية الصاعدة) و{cups} مباراة من دوري أبطال أوروبا.',
+  m3: '<b>بين الدوريات.</b> تُسحب قوة كل فريق نحو متوسط دوريه. لا يمكن تعلّم فارق المستوى بين الدوريات إلا من المباريات بينها: دوري أبطال أوروبا والأندية الصاعدة والهابطة. هذه البيانات قليلة، لذا توقعات ما بين الدوريات أقل دقة من توقعات الدوري الواحد.',
+  m4: '<b>ما لا يعرفه النموذج.</b> يقرأ النتائج النهائية فقط، ولا يعرف شيئاً عن الإصابات والإيقافات والمداورة وضغط المباريات وتغيير المدربين والطقس والحافز. المعاملات العادلة هنا بلا هامش؛ وشركات المراهنات التي تأخذ كل ذلك في الحسبان عادةً أدق. تعامل مع هذه الأرقام كنقطة انطلاق لا كيقين.',
+  freshTitle: 'حداثة البيانات، موسم {s}', thPlayed: 'لُعبت', thScheduled: 'مجدولة', thLast: 'آخر نتيجة',
+  freshNote: 'يحدّث متطوعو openfootball المصدر، عادةً بعد يوم إلى ثلاثة أيام من المباراة.',
+  failedFiles: 'تعذّر جلب {n} ملف في هذا التحميل.',
+  footData: 'البيانات: {link}، تُجلب مباشرة في كل مرة تُفتح فيها الصفحة.', footNote: 'نموذج إحصائي، وليس نتيجة مضمونة.',
+  stLive3: 'البيانات حتى <b>{date}</b> · {n} مباراة · {src} مصادر · التدريب في {ms} مللي ثانية', grpUcl: 'دوري أبطال أوروبا (أندية أخرى)',
+  tblTitle: 'جدول الترتيب',
+  tblSubOfficial: 'الترتيب الرسمي من football-data.org (مع خصم النقاط)، إلى جانب ترتيب القوة في النموذج. كلاهما يجيب عن سؤال مختلف: النقاط المجموعة حتى الآن، ومدى قوة الفريق فعلاً.',
+  tblSubComputed: 'محسوب من نتائج المباريات. شغّل جامع البيانات لعرض الترتيب الرسمي.',
+  thMP: 'لعب', thGoals: 'الأهداف', thGD: 'الفارق', thPts: 'النقاط', thXgd: 'فارق xG', thModel: 'النموذج #',
+  thXgdTip: 'فارق الأهداف المتوقعة (xG) في المباراة هذا الموسم (Understat). إذا كان أعلى من فارق الأهداف فالفريق سيئ الحظ، وإذا كان أقل فهو محظوظ.',
+  thModelTip: 'ترتيب القوة حسب النموذج داخل الدوري، وليس المركز في جدول الترتيب.',
+  teamTable: 'الترتيب: <b>{pos}</b> · {pts} نقطة', teamXg: 'xG في المباراة هذا الموسم: {f} – {a}',
+  mktTitle: 'السوق · متوسط {n} شركة مراهنات', mktBest: 'أفضل معامل',
+  mktNote: 'احتمالات السوق بعد إزالة هامش شركات المراهنات. الفارق الكبير مع النموذج يعني غالباً أخباراً لا يراها النموذج (إصابات، مداورة).',
+  mktShort: 'السوق', mktDiff: 'النموذج − السوق',
+  srcTitle: 'مصادر البيانات', thSource: 'المصدر', thStatus: 'الحالة', thFresh: 'أحدث بيانات', thNote: 'ملاحظة',
+  stOk: 'يعمل', stErr: 'فشل', stOff: 'غير مستخدم', stOld: 'نسخة قديمة',
+  srcNoSnap: 'لا توجد بيانات إضافية بعد. شغّل update-data.bat في مجلد التطبيق لإضافة football-data.org وUnderstat وOpenLigaDB ومعاملات المراهنات.',
+  srcAge: 'أُنشئت البيانات الإضافية {ago}.', srcBase: 'المصدر الرئيسي · {n} مباراة',
+  srcFd: '{n} نتيجة إضافية تشمل دوري أبطال أوروبا، و{f} مباراة مجدولة في دوري الأبطال، وجداول الترتيب الرسمية',
+  srcXg: 'xG لـ {n} مباراة (الدوريات الخمسة الكبرى)', srcOl: 'تحقق من الدوري الألماني · {n} مباراة',
+  srcOdds: '{n} مباراة · الرصيد المتبقي {r} · تحديث كل {h} ساعة',
+  confNone: 'النتائج متطابقة في جميع المصادر.', confSome: '{n} نتيجة تختلف بين المصادر:', snapStale: 'آخر إنشاء للبيانات الإضافية {ago}',
+  rankTitle3: 'ترتيب القوة (النموذج)',
+  m5: '<b>xG ودوري أبطال أوروبا.</b> في الدوريات الخمسة الكبرى يتعلّم النموذج من مزيج من {w} أهداف متوقعة (xG، Understat) و{g} أهداف حقيقية، ويضيف آخر موسمين من دوري أبطال أوروبا (football-data.org). عند اختباره بالطريقة نفسها على موسمين كاملين تحسّن log-loss بنسبة {p1} (2024/25) و{p2} (2025/26)؛ وفي الأسابيع الأولى من 2026/27 ما زال الفارق ضمن حدود الصدفة.',
+  leagues: { 'en.1': 'الدوري الإنجليزي الممتاز', 'es.1': 'الدوري الإسباني', 'de.1': 'الدوري الألماني', 'it.1': 'الدوري الإيطالي', 'fr.1': 'الدوري الفرنسي', 'nl.1': 'الدوري الهولندي', 'pt.1': 'الدوري البرتغالي', 'en.2': 'دوري البطولة الإنجليزية' },
+},
+id: {
+  tagline: 'Peluang menang, seri, dan kalah untuk liga-liga Eropa. Model dilatih ulang dari hasil pertandingan terbaru setiap kali halaman ini dibuka.',
+  langLabel: 'Bahasa', reload: 'Perbarui', reloadTitle: 'Ambil ulang data terbaru dan latih ulang model',
+  stLoading: 'Memuat data…', stLive: 'Data s.d. <b>{date}</b> · {n} laga · dilatih {ms} ms', stBad: 'Data tidak bisa diambil',
+  predTitle: 'Prediksi laga', home: 'Tuan rumah', away: 'Tamu', search: 'Cari tim…', swap: 'Tukar tuan rumah dan tamu',
+  neutral: 'Tempat netral (tanpa keuntungan kandang)', hintStart: 'Ketik nama tim, lalu pilih dari daftar.',
+  hintOdds: 'Odds wajar = 1 ÷ peluang, tanpa margin bandar. Angka dihitung dari {n} laga, dengan laga lama makin kecil bobotnya.',
+  noMatch: 'Tidak ada tim yang cocok. Coba ejaan lain, misalnya tanpa aksen.',
+  ldFetch: 'Mengambil hasil pertandingan terbaru…', ldFetchN: 'Mengambil hasil pertandingan terbaru… {d}/{n} berkas', ldTrain: 'Melatih model pada {n} laga…',
+  errTitle: 'Data pertandingan tidak bisa diambil',
+  errBody: 'Halaman ini mengambil hasil terbaru dari GitHub (openfootball) setiap kali dibuka. Periksa koneksi internet Anda, lalu coba lagi. Kalau halaman dibuka dari file di komputer dan tetap gagal, buka lewat Chrome atau Edge versi terbaru.',
+  retry: 'Coba lagi', pickTwo: 'Pilih dua tim yang berbeda.', pickBoth: 'Pilih tuan rumah dan tamu.',
+  favHome: 'diunggulkan menang di kandang', favNeutral: 'diunggulkan menang di tempat netral', favAway: 'diunggulkan menang sebagai tamu',
+  draw: 'Seri', drawSym: 'X', drawLikely: 'hasil yang paling mungkin',
+  crossLeague: 'Antar-liga · keyakinan lebih rendah',
+  crossLeagueTip: 'Kekuatan antar-liga diperkirakan dari hasil Liga Champions dan klub promosi/degradasi. Datanya jauh lebih sedikit daripada laga domestik.',
+  homeAdv: 'Keuntungan kandang {league}: +{x}% gol', fewData: 'Data {team} sedikit: {n} laga setahun terakhir',
+  fewDataTip: 'Tim dengan sedikit laga tercatat (misalnya baru promosi dari liga yang datanya tidak lengkap) punya penilaian yang lebih kasar.',
+  barAria: 'Menang {h} {ph}, seri {pd}, menang {a} {pa}', winOf: '{team} menang', fairOdds: 'odds wajar',
+  xg: 'Gol diharapkan (xG)', over25: 'Lebih dari 2,5 gol', btts: 'Kedua tim mencetak gol', cleanSheet: 'Nirbobol {h} · {a}',
+  scoreTitle: 'Peluang skor akhir', goalsHome: '↓ gol {team}', goalsAway: 'gol {team} →', gridAria: 'Grid peluang skor 0 sampai 5 gol',
+  teamMeta: '{league} · peringkat model <b>#{lr}</b> di liga, <b>#{r}</b> dari {n} tim', attack: 'Serangan', conceded: 'Kebobolan', goals: '{x} gol',
+  formAria: 'Lima laga terakhir, terbaru lebih dulu', noMatches: 'Belum ada laga', homeWord: 'kandang', awayWord: 'tandang',
+  chipTitle: '{date} · {comp} · {venue} vs {opp} {score}', vsHome: 'vs', vsAway: '@',
+  last: 'Terakhir: {vs} {opp} {score} · {date} · {comp}', h2hTitle: 'Pertemuan terakhir dalam data (sejak {season})',
+  h2hNone: 'Belum pernah bertemu dalam tiga musim terakhir yang tercatat.', ucl: 'Liga Champions', fW: 'M', fD: 'S', fL: 'K', scoreSep: '–',
+  fixTitle: 'Jadwal terdekat',
+  fixSubWeek: 'Laga 7 hari ke depan yang belum dimainkan. Klik satu laga untuk melihat rinciannya. Jam sesuai data sumber (waktu setempat).',
+  fixSubNext: 'Belum ada laga dalam 7 hari ke depan; ini laga berikutnya. Jam sesuai data sumber (waktu setempat).',
+  filterAria: 'Saring liga', all: 'Semua', fixRowAria: '{h} lawan {a}: {ph}, seri {pd}, {pa}', fixNone: 'Tidak ada laga terjadwal untuk liga ini dalam data.',
+  rankTitle: 'Peringkat kekuatan',
+  rankSub: 'Gol yang diharapkan per laga melawan tim rata-rata liga top Eropa di tempat netral. Semakin tinggi serangan dan semakin rendah kebobolan, semakin kuat.',
+  thTeam: 'Tim', thLeague: 'Liga', thAttack: 'Serangan', thConceded: 'Kebobolan', thDiff: 'Selisih', thForm: '5 laga',
+  rankRowTitle: 'Klik untuk memakai {team} di prediksi',
+  accTitle: 'Seberapa akurat?',
+  accSub: 'Diuji dengan cara yang sama seperti dipakai sungguhan: tiap minggu model dilatih hanya dari laga sebelum minggu itu, lalu memprediksi laga minggu itu. Dihitung ulang di browser Anda dari data terbaru.',
+  season: 'Musim {s}', accCurSub: 'Berjalan · tidak pernah dilihat saat setelan model dipilih', accPrevSub: 'Satu musim penuh · dipakai untuk memilih setelan model',
+  waiting: 'Menunggu…', testing: 'Menguji…', accMeta: '{n} laga · {s} dtk', accNone: 'Belum ada laga yang bisa diuji.',
+  accTop: 'Tebakan teratas benar', accHome: 'Kalau selalu pilih tuan rumah', accLL: 'Log-loss model', accBase: 'Log-loss patokan',
+  accBaseNote: 'frekuensi 1/X/2', accGain: 'Lebih baik dari patokan',
+  calib: 'Kalibrasi', calibWait: 'Grafik muncul setelah pengujian selesai.', calibTitle: 'Kalibrasi · {n} laga, tiga peluang per laga',
+  calibDot: 'Diprediksi {p}, terjadi {q} ({n} peluang)', calibAxis: 'peluang menurut model',
+  calibAria: 'Grafik kalibrasi: peluang prediksi dibanding frekuensi kejadian',
+  calibCap: 'Titik di garis putus-putus berarti jujur: kalau model bilang 40%, kejadiannya memang sekitar 40%. Sumbu tegak = seberapa sering hasil itu benar-benar terjadi; besar titik = jumlah prediksi.',
+  methodTitle: 'Cara kerja dan batasannya',
+  m1: '<b>Model.</b> Setiap tim punya dua angka: kekuatan menyerang dan bertahan. Gol tiap tim dalam satu laga dianggap mengikuti distribusi Poisson dengan rata-rata dari kedua angka itu plus keuntungan kandang liganya. Koreksi Dixon-Coles (ρ = {rho}) menyesuaikan peluang skor rendah seperti 0–0 dan 1–1, yang lebih sering terjadi daripada tebakan Poisson murni.',
+  m2: '<b>Data terbaru lebih berat.</b> Bobot sebuah laga berkurang separuh setiap {hl} hari, jadi performa minggu lalu jauh lebih berpengaruh daripada musim lalu. Model dilatih ulang dari nol setiap halaman dibuka, pada {n} laga dari tiga musim, termasuk divisi dua (riwayat tim promosi) dan {cups} laga Liga Champions.',
+  m3: '<b>Antar-liga.</b> Kekuatan tim ditarik ke rata-rata liganya. Selisih level antar-liga hanya bisa dipelajari dari laga lintas liga: Liga Champions dan klub yang naik atau turun divisi. Datanya sedikit, jadi prediksi antar-liga lebih kasar daripada laga domestik.',
+  m4: '<b>Yang tidak diketahui model.</b> Model hanya membaca skor akhir. Ia tidak tahu cedera, skorsing, rotasi pemain, jadwal padat, pergantian pelatih, cuaca, atau motivasi. Odds wajar di sini tanpa margin bandar; bandar yang membaca semua informasi itu biasanya lebih tajam. Pakai angka ini sebagai titik awal, bukan kepastian.',
+  freshTitle: 'Kesegaran data musim {s}', thPlayed: 'Dimainkan', thScheduled: 'Terjadwal', thLast: 'Hasil terakhir',
+  freshNote: 'Sumber diperbarui relawan openfootball, biasanya satu sampai tiga hari setelah laga.',
+  failedFiles: '{n} berkas gagal diambil pada pemuatan ini.',
+  footData: 'Data: {link}, diambil langsung setiap halaman dibuka.', footNote: 'Model statistik, bukan jaminan hasil.',
+  stLive3: 'Data s.d. <b>{date}</b> · {n} laga · {src} sumber · dilatih {ms} ms', grpUcl: 'Liga Champions (klub lain)',
+  tblTitle: 'Klasemen',
+  tblSubOfficial: 'Klasemen resmi dari football-data.org (termasuk pengurangan poin), disandingkan dengan peringkat kekuatan model. Keduanya menjawab hal berbeda: poin yang sudah dikumpulkan, dan seberapa kuat tim sebenarnya.',
+  tblSubComputed: 'Dihitung dari hasil pertandingan. Jalankan pengumpul data untuk menampilkan klasemen resmi.',
+  thMP: 'Main', thGoals: 'Gol', thGD: 'SG', thPts: 'Poin', thXgd: 'Selisih xG', thModel: 'Model #',
+  thXgdTip: 'Selisih gol harapan (xG) per laga musim ini (Understat). Di atas selisih gol: tim sedang sial; di bawahnya: sedang beruntung.',
+  thModelTip: 'Peringkat kekuatan menurut model di dalam liga — bukan posisi klasemen.',
+  teamTable: 'Klasemen: <b>#{pos}</b> · {pts} poin', teamXg: 'xG per laga musim ini: {f} – {a}',
+  mktTitle: 'Pasar · rata-rata {n} bandar', mktBest: 'odds terbaik',
+  mktNote: 'Peluang pasar setelah margin bandar dihapus. Selisih besar dengan model biasanya berarti ada kabar yang tidak dilihat model (cedera, rotasi).',
+  mktShort: 'pasar', mktDiff: 'model − pasar',
+  srcTitle: 'Sumber data', thSource: 'Sumber', thStatus: 'Status', thFresh: 'Data terbaru', thNote: 'Keterangan',
+  stOk: 'OK', stErr: 'Gagal', stOff: 'Tidak dipakai', stOld: 'Salinan lama',
+  srcNoSnap: 'Data tambahan belum ada. Jalankan update-data.bat di folder aplikasi untuk menambahkan football-data.org, Understat, OpenLigaDB, dan odds bandar.',
+  srcAge: 'Data tambahan dibuat {ago}.', srcBase: 'Sumber utama · {n} laga',
+  srcFd: '{n} hasil tambahan termasuk Liga Champions, {f} laga Liga Champions terjadwal, klasemen resmi',
+  srcXg: 'xG untuk {n} laga (5 liga top)', srcOl: 'Pembanding Bundesliga · {n} laga',
+  srcOdds: '{n} laga · sisa kuota {r} · diperbarui tiap {h} jam',
+  confNone: 'Skor dari semua sumber cocok.', confSome: '{n} skor berbeda antar-sumber:', snapStale: 'Data tambahan terakhir dibuat {ago}',
+  rankTitle3: 'Peringkat kekuatan (model)',
+  m5: '<b>xG dan Liga Champions.</b> Untuk 5 liga top, model belajar dari campuran {w} gol harapan (xG, Understat) dan {g} gol sungguhan, ditambah dua musim terakhir Liga Champions dari football-data.org. Diuji walk-forward pada dua musim penuh, log-loss membaik {p1} (2024/25) dan {p2} (2025/26); di minggu-minggu awal 2026/27 selisihnya masih dalam batas kebetulan.',
+},
+};
+
+let LANG = 'en';
+let NF = null;
+
+// Plain text: for textContent, or wrapped in esc() for attributes.
+function tx(key, vars) {
+  const s = (I18N[LANG] && I18N[LANG][key] !== undefined) ? I18N[LANG][key] : (I18N.en[key] !== undefined ? I18N.en[key] : key);
+  return vars ? s.replace(/\{(\w+)\}/g, (m, k) => (vars[k] === undefined ? m : (vars[k] && vars[k].raw !== undefined ? vars[k].raw : String(vars[k])))) : s;
+}
+// HTML: the template keeps its tags, every inserted value is escaped (unless passed as {raw: html}).
+function th(key, vars) {
+  const s = (I18N[LANG] && I18N[LANG][key] !== undefined) ? I18N[LANG][key] : (I18N.en[key] !== undefined ? I18N.en[key] : key);
+  return vars ? s.replace(/\{(\w+)\}/g, (m, k) => (vars[k] === undefined ? m : (vars[k] && vars[k].raw !== undefined ? vars[k].raw : esc(vars[k])))) : s;
+}
+
+function detectLang() {
+  const h = (location.hash || '').slice(1);
+  if (I18N[h]) return h;
+  // 'laga1x2.lang' = the key used before the rename to MatchLab
+  try { const s = localStorage.getItem('matchlab.lang') || localStorage.getItem('laga1x2.lang'); if (s && I18N[s]) return s; } catch (e) { /* storage blocked */ }
+  for (const l of (navigator.languages || [navigator.language || ''])) {
+    const c = String(l).toLowerCase().slice(0, 2);
+    if (I18N[c]) return c;
+  }
+  return 'en';
+}
+
+function buildFormatters() {
+  const loc = LOCALE[LANG];
+  NF = {
+    pct0: new Intl.NumberFormat(loc, { style: 'percent', maximumFractionDigits: 0 }),
+    pct1: new Intl.NumberFormat(loc, { style: 'percent', minimumFractionDigits: 1, maximumFractionDigits: 1 }),
+    d0: new Intl.NumberFormat(loc, { maximumFractionDigits: 0 }),
+    d1: new Intl.NumberFormat(loc, { minimumFractionDigits: 1, maximumFractionDigits: 1 }),
+    d2: new Intl.NumberFormat(loc, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+    d3: new Intl.NumberFormat(loc, { minimumFractionDigits: 3, maximumFractionDigits: 3 }),
+  };
+}
+
+function ensureFonts(code) {
+  const href = FONTS[code];
+  if (!href || document.getElementById('font-' + code)) return;
+  const l = document.createElement('link');
+  l.rel = 'stylesheet'; l.href = href; l.id = 'font-' + code;
+  document.head.appendChild(l);
+}
+
+function applyStatic() {
+  document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = tx(el.dataset.i18n); });
+  document.querySelectorAll('[data-i18n-ph]').forEach(el => { el.placeholder = tx(el.dataset.i18nPh); });
+  document.querySelectorAll('[data-i18n-title]').forEach(el => { el.title = tx(el.dataset.i18nTitle); });
+  document.querySelectorAll('[data-i18n-aria]').forEach(el => { el.setAttribute('aria-label', tx(el.dataset.i18nAria)); });
+  $('lang').setAttribute('aria-label', tx('langLabel'));
+  $('foot-data').innerHTML = th('footData', { link: { raw: '<a href="https://github.com/openfootball/football.json" target="_blank" rel="noopener">openfootball / football.json</a>' } });
+}
+
+function setLang(code, save) {
+  LANG = I18N[code] ? code : 'en';
+  document.documentElement.lang = LANG;
+  document.documentElement.dir = LANG === 'ar' ? 'rtl' : 'ltr';
+  ensureFonts(LANG);
+  buildFormatters();
+  $('lang').value = LANG;
+  if (save) {
+    try { localStorage.setItem('matchlab.lang', LANG); } catch (e) { /* storage blocked */ }
+    try { history.replaceState(null, '', '#' + LANG); } catch (e) { /* file:// may refuse */ }
+  }
+  applyStatic();
+  renderStatus();
+  if (S.M) {
+    renderPicker(); renderResult(); renderStandings(); renderFixtures(); renderRanking(); renderMethod(); renderAccuracy();
+  } else {
+    renderLoading();
+    if (!$('pick-hint').dataset.set) $('pick-hint').textContent = tx('hintStart');
+  }
+}
+
+/* ==================================================================
+   CONFIG
+   ================================================================== */
+const BASE = 'https://raw.githubusercontent.com/openfootball/football.json/master/';
+const LEAGUES = [
+  { code: 'en.1', name: 'Premier League', short: 'PL', top: true },
+  { code: 'es.1', name: 'La Liga', short: 'LALIGA', top: true },
+  { code: 'de.1', name: 'Bundesliga', short: 'BUNDES', top: true },
+  { code: 'it.1', name: 'Serie A', short: 'SERIE A', top: true },
+  { code: 'fr.1', name: 'Ligue 1', short: 'LIGUE 1', top: true },
+  { code: 'nl.1', name: 'Eredivisie', short: 'EREDIV', top: true },
+  { code: 'pt.1', name: 'Liga Portugal', short: 'PORTUGAL', top: true },
+  { code: 'en.2', name: 'Championship', short: 'CHAMP', top: false },
+];
+const HISTORY_ONLY = ['es.2', 'de.2', 'it.2', 'fr.2'];   // history of promoted clubs
+// The link between league strengths. Files openfootball has not published yet (404) are still
+// requested so they are used as soon as they appear; those 404s are expected and handled.
+const CUPS = ['uefa.cl'];
+// Settings chosen by a walk-forward test on season 2025/26 (2,892 matches, 3-way log-loss):
+//   half-life 150/240/365/540 days x sigma 0.15/0.25/0.40 -> best 240 days, sigma 0.40 (1.0062);
+//   sigma 0.40/0.55/0.75/1.00 at 240 days -> 1.0062 / 1.0061 / 1.0065 / 1.0070. The curve is flat
+//   around the minimum, so 240 days and sigma 0.5 are used. The current season took no part in the choice.
+// xgWeight: share of Understat xG blended into the fit's targets (0 = goals only). model-lab/xg_test.py,
+// walk-forward log-loss, goals only -> 60% xG (+ Champions League 2025/26-2026/27 from football-data.org):
+//   2025/26 (weight chosen here)  1.0061 -> 1.0034   (xG 25/50/75/100%: 1.0041 / 1.0034 / 1.0034 / 1.0040)
+//   2024/25 (independent season)  1.0047 -> 0.9973   top-5 leagues 0.9959 -> 0.9836
+//   2026/27 first 5 weeks, n=421  1.0042 -> 1.0068   (about one standard error: noise at this size)
+const CFG = { halfLife: 240, sigma: 0.5, tau: 0.5, homeSd: 0.1, maxIter: 400, tol: 1e-5, xgWeight: 0.6 };
+const MAXG = 10;
+const LG = Object.fromEntries(LEAGUES.map(l => [l.code, l]));
+const UCL = 'uefa.cl';
+const DISPLAY_COMPS = LEAGUES.concat([{ code: UCL, short: 'UCL' }]);
+const leagueName = code => (code === UCL ? tx('ucl') : ((I18N[LANG].leagues && I18N[LANG].leagues[code]) || (LG[code] ? LG[code].name : code)));
+const lgShort = code => (code === UCL ? 'UCL' : (LG[code] ? LG[code].short : code));
+
+/* ==================================================================
+   DATES (integer day numbers, UTC)
+   ================================================================== */
+const DAYMS = 86400000;
+const parseDay = s => { const [y, m, d] = s.split('-').map(Number); return Date.UTC(y, m - 1, d) / DAYMS; };
+const todayDay = () => { const n = new Date(); return Date.UTC(n.getFullYear(), n.getMonth(), n.getDate()) / DAYMS; };
+const dayDate = d => new Date(d * DAYMS);
+const mondayOf = d => d - ((d + 3) % 7);           // 1 Jan 1970 was a Thursday
+function seasonKeyOf(day) {
+  const dt = dayDate(day); const y = dt.getUTCFullYear(), m = dt.getUTCMonth() + 1;
+  const s = m >= 7 ? y : y - 1;
+  return `${s}-${String((s + 1) % 100).padStart(2, '0')}`;
+}
+const seasonStart = key => Date.UTC(+key.slice(0, 4), 6, 1) / DAYMS;
+const prevSeason = key => { const s = +key.slice(0, 4) - 1; return `${s}-${String((s + 1) % 100).padStart(2, '0')}`; };
+const seasonLabel = key => `${key.slice(0, 4)}/${key.slice(5)}`;
+const fmtDay = (d, opt) => dayDate(d).toLocaleDateString(LOCALE[LANG], Object.assign({ timeZone: 'UTC' }, opt || { weekday: 'short', day: 'numeric', month: 'short' }));
+
+/* ==================================================================
+   FORMATTING (follows the chosen language)
+   ================================================================== */
+const pct = p => (p < 0.005 ? '<' + NF.pct0.format(0.01) : NF.pct0.format(p));
+const pct1 = p => NF.pct1.format(p);
+const dec = (x, n = 2) => NF['d' + n].format(x);
+const fmtInt = n => NF.d0.format(n);
+const odds = p => (p > 0.001 ? dec(1 / p) : '—');
+const score = (a, b) => `${a}${tx('scoreSep')}${b}`;
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const fold = s => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+const cleanName = n => n.replace(/\s*\([A-Z]{3}\)\s*$/, '').trim();
+
+// Official names in the data are often long. Legal-form prefixes/suffixes are dropped, then the
+// names that are still too long are replaced by what people actually call the club.
+const ALIAS = {
+  'Sport Lisboa e Benfica': 'Benfica', 'Sporting Clube de Portugal': 'Sporting CP', 'Sporting Clube de Braga': 'Braga',
+  'Club Atlético de Madrid': 'Atlético Madrid', 'Internazionale Milano': 'Inter',
+  'Racing Club de Lens': 'Lens', 'Olympique Lyonnais': 'Lyon', 'Olympique de Marseille': 'Marseille',
+  'Stade Rennais': 'Rennes', 'Stade Brestois 29': 'Brest', 'Strasbourg Alsace': 'Strasbourg', 'Paris': 'Paris FC',
+  'Rayo Vallecano de Madrid': 'Rayo Vallecano', 'Espanyol de Barcelona': 'Espanyol', 'Real Betis Balompié': 'Real Betis',
+  'Celta de Vigo': 'Celta Vigo', 'Brighton & Hove Albion': 'Brighton', 'Wolverhampton Wanderers': 'Wolves',
+  'Tottenham Hotspur': 'Tottenham', 'Feyenoord Rotterdam': 'Feyenoord', 'Bayer 04 Leverkusen': 'Leverkusen',
+  'Borussia Mönchengladbach': "M'gladbach", 'Twente \'65': 'Twente',
+};
+// "Brighton & Hove Albion FC" -> "Brighton", "TSG 1899 Hoffenheim" -> "Hoffenheim", "SV 07 Elversberg" -> "Elversberg"
+function shortName(full) {
+  let s = full;
+  s = s.replace(/^(?:1\.\s*(?:FC|FSV)|FC|AFC|ACF|AC|AS|AJ|SS|SSC|US|RC|RCD|CA|CD|CS|SD|UD|SC|SV|VfB|VfL|TSG|FK|OGC)\s+(?=\S)/, '');
+  s = s.replace(/^(?:(?:18|19|20)\d\d|\d\d)\s+/, '');
+  for (let k = 0; k < 3; k++) s = s.replace(/\s+(?:FC|CF|AFC|CFC|UD|BC|SC|AC|OSC|SCO|Calcio|de Fútbol|(?:18|19|20)\d\d)$/, '');
+  s = ALIAS[s] || s;
+  return s.length >= 3 ? s : full;
+}
+
+/* ==================================================================
+   DATA
+   ================================================================== */
+// Full-time score, or null. Since 2025/26 openfootball writes a 0-0 as
+// "score": [0, 0] instead of {"ft": [0, 0]}. Without this every 0-0 of the current season
+// is lost: the model overestimates goals and underestimates draws.
+// The list form is trusted only when the match date has passed.
+function scoreFt(sc, day, today) {
+  let ft = null;
+  if (sc && !Array.isArray(sc) && Array.isArray(sc.ft)) ft = sc.ft;
+  else if (Array.isArray(sc) && day < today) ft = sc;
+  if (!ft || ft.length !== 2) return null;
+  const a = +ft[0], b = +ft[1];
+  return Number.isInteger(a) && Number.isInteger(b) && a >= 0 && b >= 0 ? [a, b] : null;
+}
+
+async function loadData(onProgress) {
+  const today = todayDay();
+  const cur = seasonKeyOf(today);
+  const seasons = [cur, prevSeason(cur), prevSeason(prevSeason(cur))];
+  const jobs = [];
+  for (const s of seasons) {
+    for (const l of LEAGUES) jobs.push({ s, code: l.code, kind: 'league' });
+    for (const c of HISTORY_ONLY) jobs.push({ s, code: c, kind: 'history' });
+    for (const c of CUPS) jobs.push({ s, code: c, kind: 'cup' });
+  }
+  let done = 0;
+  const got = await Promise.all(jobs.map(async j => {
+    try {
+      const r = await fetch(`${BASE}${j.s}/${j.code}.json`, { cache: 'no-cache' });
+      return Object.assign({}, j, { json: r.ok ? await r.json() : null });
+    } catch (e) {
+      return Object.assign({}, j, { json: null, err: true });
+    } finally {
+      onProgress(++done, jobs.length);
+    }
+  }));
+  const played = [], fixtures = [], files = [];
+  const teamLeague = new Map();          // this season's team -> league
+  for (const g of got) {
+    if (!g.json || !Array.isArray(g.json.matches)) continue;
+    files.push({ s: g.s, code: g.code, kind: g.kind, n: g.json.matches.length });
+    for (const m of g.json.matches) {
+      if (!m.team1 || !m.team2 || !m.date) continue;
+      const h = cleanName(m.team1), a = cleanName(m.team2);
+      const day = parseDay(m.date);
+      const ft = scoreFt(m.score, day, today);
+      if (g.kind === 'league' && g.s === cur) { teamLeague.set(h, g.code); teamLeague.set(a, g.code); }
+      const rec = { day, time: m.time || '', h, a, comp: g.code, season: g.s, cup: g.kind === 'cup', round: m.round || '' };
+      if (ft) {
+        rec.hg = ft[0]; rec.ag = ft[1]; played.push(rec);
+      } else if (g.kind === 'league' && g.s === cur) {
+        fixtures.push(rec);
+      }
+    }
+  }
+  played.sort((x, y) => x.day - y.day);
+  fixtures.sort((x, y) => x.day - y.day || x.time.localeCompare(y.time));
+  const curFiles = files.filter(f => f.s === cur && f.kind === 'league');
+  return { cur, seasons, played, fixtures, teamLeague, files, curFiles, failed: got.filter(g => g.err).length, ofCount: played.length };
+}
+
+/* ==================================================================
+   SNAPSHOT from the data collector (collector/collect.py -> data/latest.js)
+   Adds what openfootball does not have: football-data.org results (Champions League
+   2025/26 + current, any league result openfootball has not entered yet), official
+   tables, Understat xG and bookmaker odds. Optional: without it the page works as before.
+   ================================================================== */
+function loadSnapshot() {
+  return new Promise(resolve => {
+    document.querySelectorAll('script[data-snap]').forEach(s => s.remove());
+    // LAGA_SNAPSHOT = the name a collector from before the rename writes
+    window.MATCHLAB_SNAPSHOT = window.LAGA_SNAPSHOT = undefined;
+    const s = document.createElement('script');
+    s.dataset.snap = '1';
+    // cache-busting only over http(s); a file:// page loads the file as it is
+    s.src = 'data/latest.js' + (/^https?:$/.test(location.protocol) ? '?t=' + Math.floor(Date.now() / 60000) : '');
+    s.onload = () => resolve(window.MATCHLAB_SNAPSHOT || window.LAGA_SNAPSHOT || null);
+    s.onerror = () => resolve(null);
+    document.head.appendChild(s);
+  });
+}
+
+const isoDay = d => dayDate(d).toISOString().slice(0, 10);
+
+function mergeSnapshot(data, snap) {
+  data.snap = snap || null;
+  data.odds = new Map(); data.standings = {}; data.xgN = 0; data.extraN = 0; data.cupTeams = new Set();
+  if (!snap) return;
+  const today = todayDay();
+  const ofCupSeasons = new Set(data.played.filter(r => r.cup).map(r => r.season));
+  const near = new Map();              // season|comp|h|a -> [days] of openfootball league matches
+  for (const r of data.played) if (!r.cup) {
+    const k = `${r.season}|${r.comp}|${r.h}|${r.a}`;
+    if (!near.has(k)) near.set(k, []);
+    near.get(k).push(r.day);
+  }
+  for (const e of snap.extra || []) {
+    const day = parseDay(e.d);
+    if (e.cup) { if (ofCupSeasons.has(e.season)) continue; }            // openfootball caught up: no double count
+    else {
+      const ds = near.get(`${e.season}|${e.comp}|${e.h}|${e.a}`) || [];
+      if (ds.some(d => Math.abs(d - day) <= 3)) continue;
+    }
+    data.played.push({ day, time: '', h: e.h, a: e.a, comp: e.comp, season: e.season, cup: !!e.cup, round: e.stage || '', hg: e.hg, ag: e.ag, src: e.src });
+    data.extraN++;
+  }
+  data.played.sort((x, y) => x.day - y.day);
+  const xg = snap.xg || {};
+  for (const r of data.played) {
+    const v = xg[`${isoDay(r.day)}|${r.h}|${r.a}`];
+    if (v) { r.xh = v[0]; r.xa = v[1]; data.xgN++; }
+  }
+  // Champions League: this season's clubs and upcoming matches
+  for (const e of snap.extra || []) if (e.cup && e.season === data.cur) { data.cupTeams.add(e.h); data.cupTeams.add(e.a); }
+  for (const f of snap.cupFixtures || []) {
+    data.cupTeams.add(f.h); data.cupTeams.add(f.a);
+    const day = parseDay(f.d);
+    if (day >= today) data.fixtures.push({ day, time: f.time ? f.time + ' UTC' : '', h: f.h, a: f.a, comp: UCL, season: f.season, cup: true, round: f.stage || '' });
+  }
+  data.fixtures.sort((x, y) => x.day - y.day || x.time.localeCompare(y.time));
+  for (const t of data.cupTeams) if (!data.teamLeague.has(t)) data.teamLeague.set(t, UCL);
+  for (const o of snap.odds || []) if (parseDay(o.d) >= today - 1) data.odds.set(`${o.h}|${o.a}`, o);
+  data.standings = snap.standings || {};
+}
+
+/* ==================================================================
+   MODEL
+   Hierarchical, time-decayed Dixon-Coles.
+     log E[home goals] = mu + home[competition] + att[home] - def[away]
+     log E[away goals] = mu + att[away] - def[home]
+   att/def shrink to the team's league mean (sd sigma), league means shrink
+   to 0 (sd tau), home advantage per competition shrinks to a shared value.
+   Match weight = 2^(-age / half-life). Low-score dependence (rho) as in Dixon-Coles.
+   ================================================================== */
+function teamIndex(played, extra) {
+  const set = new Set();
+  for (const r of played) { set.add(r.h); set.add(r.a); }
+  for (const t of extra) set.add(t);
+  const teams = [...set].sort();
+  return { teams, idx: new Map(teams.map((t, i) => [t, i])) };
+}
+
+function fitModel(played, asof, TI, init) {
+  const rows = [];
+  for (const r of played) { if (r.day < asof) rows.push(r); else break; }
+  const T = TI.teams.length, n = rows.length;
+  const compList = [...new Set(rows.map(r => r.comp))].sort();
+  const ci = new Map(compList.map((c, i) => [c, i])); const C = compList.length;
+  const leagueOf = new Map();
+  for (const r of rows) if (!r.cup) { leagueOf.set(r.h, r.comp); leagueOf.set(r.a, r.comp); }
+  const lgList = [...new Set([...leagueOf.values(), 'other'])].sort();
+  const li = new Map(lgList.map((l, i) => [l, i])); const L = lgList.length;
+  const tl = new Int32Array(T);
+  for (let i = 0; i < T; i++) tl[i] = li.get(leagueOf.get(TI.teams[i]) || 'other');
+  const H = new Int32Array(n), A = new Int32Array(n), CC = new Int32Array(n);
+  const X = new Float64Array(n), Y = new Float64Array(n), W = new Float64Array(n);
+  const GX = new Float64Array(n), GY = new Float64Array(n);     // real scores: rho is estimated on these
+  const k = Math.LN2 / CFG.halfLife, xw = CFG.xgWeight || 0;
+  for (let m = 0; m < n; m++) {
+    const r = rows[m];
+    H[m] = TI.idx.get(r.h); A[m] = TI.idx.get(r.a); CC[m] = ci.get(r.comp);
+    GX[m] = r.hg; GY[m] = r.ag;
+    // targets: goals, or a blend of goals and xG where Understat has the match
+    X[m] = xw > 0 && r.xh !== undefined ? (1 - xw) * r.hg + xw * r.xh : r.hg;
+    Y[m] = xw > 0 && r.xa !== undefined ? (1 - xw) * r.ag + xw * r.xa : r.ag;
+    W[m] = Math.exp(-k * (asof - r.day));
+  }
+  const att = init ? Float64Array.from(init.att) : new Float64Array(T);
+  const dfn = init ? Float64Array.from(init.dfn) : new Float64Array(T);
+  const home = new Float64Array(C).fill(0.25);
+  if (init) compList.forEach((c, i) => { if (init.ci.has(c)) home[i] = init.home[init.ci.get(c)]; });
+  let mu = init ? init.mu : 0.2;
+  const LA = new Float64Array(L), LD = new Float64Array(L), cntL = new Float64Array(L);
+  for (let i = 0; i < T; i++) cntL[tl[i]]++;
+  if (init) for (let i = 0; i < T; i++) { LA[tl[i]] += att[i]; LD[tl[i]] += dfn[i]; }
+  if (init) for (let l = 0; l < L; l++) { const den = cntL[l] / CFG.sigma ** 2 + 1 / CFG.tau ** 2; LA[l] = LA[l] / CFG.sigma ** 2 / den; LD[l] = LD[l] / CFG.sigma ** 2 / den; }
+  const s2 = CFG.sigma ** 2, t2 = CFG.tau ** 2, h2 = CFG.homeSd ** 2;
+  const lam = new Float64Array(n), nu = new Float64Array(n);
+  const g = new Float64Array(T), hs = new Float64Array(T);
+  const gc = new Float64Array(C), hc = new Float64Array(C);
+  const gl = new Float64Array(L), hl = new Float64Array(L), dl = new Float64Array(L);
+  const compute = () => {
+    for (let m = 0; m < n; m++) {
+      lam[m] = Math.exp(mu + home[CC[m]] + att[H[m]] - dfn[A[m]]);
+      nu[m] = Math.exp(mu + att[A[m]] - dfn[H[m]]);
+    }
+  };
+  let it = 0;
+  for (; it < CFG.maxIter; it++) {
+    let maxStep = 0;
+    compute();
+    g.fill(0); hs.fill(0);
+    for (let m = 0; m < n; m++) {
+      const w = W[m];
+      g[H[m]] += w * (X[m] - lam[m]); g[A[m]] += w * (Y[m] - nu[m]);
+      hs[H[m]] += w * lam[m]; hs[A[m]] += w * nu[m];
+    }
+    for (let i = 0; i < T; i++) {
+      const st = (g[i] - (att[i] - LA[tl[i]]) / s2) / (hs[i] + 1 / s2);
+      att[i] += st; if (Math.abs(st) > maxStep) maxStep = Math.abs(st);
+    }
+    compute();
+    g.fill(0); hs.fill(0);
+    for (let m = 0; m < n; m++) {
+      const w = W[m];
+      g[A[m]] -= w * (X[m] - lam[m]); g[H[m]] -= w * (Y[m] - nu[m]);
+      hs[A[m]] += w * lam[m]; hs[H[m]] += w * nu[m];
+    }
+    for (let i = 0; i < T; i++) {
+      const st = (g[i] - (dfn[i] - LD[tl[i]]) / s2) / (hs[i] + 1 / s2);
+      dfn[i] += st; if (Math.abs(st) > maxStep) maxStep = Math.abs(st);
+    }
+    LA.fill(0); LD.fill(0);
+    for (let i = 0; i < T; i++) { LA[tl[i]] += att[i]; LD[tl[i]] += dfn[i]; }
+    for (let l = 0; l < L; l++) { const den = cntL[l] / s2 + 1 / t2; LA[l] = LA[l] / s2 / den; LD[l] = LD[l] / s2 / den; }
+    // att+c & mu-c (also def+c & mu+c) changes no prediction; only the N(0, tau) prior on the
+    // league means sees it, and it is smallest at c = their mean. Without this the iterations crawl.
+    let cA = 0, cD = 0;
+    for (let l = 0; l < L; l++) { cA += LA[l]; cD += LD[l]; }
+    cA /= L; cD /= L;
+    for (let i = 0; i < T; i++) { att[i] -= cA; dfn[i] -= cD; }
+    for (let l = 0; l < L; l++) { LA[l] -= cA; LD[l] -= cD; }
+    mu += cA - cD;
+    // Move a whole league (its teams and its mean together): the team priors do not change, one Newton step.
+    compute();
+    gl.fill(0); hl.fill(0);
+    for (let m = 0; m < n; m++) {
+      const w = W[m], lh = tl[H[m]], la = tl[A[m]];
+      gl[lh] += w * (X[m] - lam[m]); gl[la] += w * (Y[m] - nu[m]);
+      hl[lh] += w * lam[m]; hl[la] += w * nu[m];
+    }
+    for (let l = 0; l < L; l++) { dl[l] = (gl[l] - LA[l] / t2) / (hl[l] + 1 / t2); LA[l] += dl[l]; }
+    for (let i = 0; i < T; i++) att[i] += dl[tl[i]];
+    compute();
+    gl.fill(0); hl.fill(0);
+    for (let m = 0; m < n; m++) {
+      const w = W[m], lh = tl[H[m]], la = tl[A[m]];
+      gl[la] -= w * (X[m] - lam[m]); gl[lh] -= w * (Y[m] - nu[m]);
+      hl[la] += w * lam[m]; hl[lh] += w * nu[m];
+    }
+    for (let l = 0; l < L; l++) { dl[l] = (gl[l] - LD[l] / t2) / (hl[l] + 1 / t2); LD[l] += dl[l]; }
+    for (let i = 0; i < T; i++) dfn[i] += dl[tl[i]];
+    compute();
+    let h0 = 0; for (let c = 0; c < C; c++) h0 += home[c]; h0 /= Math.max(1, C);
+    gc.fill(0); hc.fill(0);
+    for (let m = 0; m < n; m++) { gc[CC[m]] += W[m] * (X[m] - lam[m]); hc[CC[m]] += W[m] * lam[m]; }
+    for (let c = 0; c < C; c++) home[c] += (gc[c] - (home[c] - h0) / h2) / (hc[c] + 1 / h2);
+    compute();
+    let num = 0, den = 0;
+    for (let m = 0; m < n; m++) { num += W[m] * ((X[m] - lam[m]) + (Y[m] - nu[m])); den += W[m] * (lam[m] + nu[m]); }
+    if (den > 0) mu += num / den;
+    if (maxStep < CFG.tol) { it++; break; }
+  }
+  // Dixon-Coles rho: profile likelihood on the 0-0, 1-0, 0-1, 1-1 scores
+  compute();
+  let best = -Infinity, rho = 0;
+  for (let q = -50; q <= 20; q++) {
+    const r = q * 0.005; let ll = 0, ok = true;
+    for (let m = 0; m < n; m++) {
+      const x = GX[m], y = GY[m];
+      if (x > 1 || y > 1) continue;
+      const t = x === 0 && y === 0 ? 1 - lam[m] * nu[m] * r : x === 0 ? 1 + lam[m] * r : y === 0 ? 1 + nu[m] * r : 1 - r;
+      if (t <= 0) { ok = false; break; }
+      ll += W[m] * Math.log(t);
+    }
+    if (ok && ll > best) { best = ll; rho = r; }
+  }
+  return { att, dfn, home, ci, compList, mu, rho, iters: it, n, asof, leagueOf };
+}
+
+function poissonVec(l) {
+  const v = new Float64Array(MAXG + 1); v[0] = Math.exp(-l);
+  for (let k = 1; k <= MAXG; k++) v[k] = v[k - 1] * l / k;
+  return v;
+}
+function homeAdv(M, comp) {
+  if (M.ci.has(comp)) return M.home[M.ci.get(comp)];
+  let s = 0; for (const h of M.home) s += h; return s / Math.max(1, M.home.length);
+}
+function predict(M, hi, ai, comp, neutral) {
+  const hc = neutral ? 0 : homeAdv(M, comp);
+  const lam = Math.exp(M.mu + hc + M.att[hi] - M.dfn[ai]);
+  const nu = Math.exp(M.mu + M.att[ai] - M.dfn[hi]);
+  const px = poissonVec(lam), py = poissonVec(nu);
+  const G = []; let tot = 0;
+  for (let i = 0; i <= MAXG; i++) {
+    G.push(new Float64Array(MAXG + 1));
+    for (let j = 0; j <= MAXG; j++) G[i][j] = px[i] * py[j];
+  }
+  const r = M.rho;
+  G[0][0] *= 1 - lam * nu * r; G[0][1] *= 1 + lam * r; G[1][0] *= 1 + nu * r; G[1][1] *= 1 - r;
+  for (let i = 0; i <= MAXG; i++) for (let j = 0; j <= MAXG; j++) tot += G[i][j];
+  let pH = 0, pD = 0, pA = 0, o25 = 0, btts = 0, csH = 0, csA = 0;
+  const list = [];
+  for (let i = 0; i <= MAXG; i++) for (let j = 0; j <= MAXG; j++) {
+    const p = G[i][j] / tot; G[i][j] = p;
+    if (i > j) pH += p; else if (i === j) pD += p; else pA += p;
+    if (i + j >= 3) o25 += p;
+    if (i > 0 && j > 0) btts += p;
+    if (j === 0) csH += p;
+    if (i === 0) csA += p;
+    list.push({ i, j, p });
+  }
+  list.sort((a, b) => b.p - a.p);
+  return { pH, pD, pA, lam, nu, grid: G, o25, btts, csH, csA, top: list.slice(0, 6) };
+}
+
+/* ==================================================================
+   APP STATE
+   ================================================================== */
+const S = {
+  data: null, TI: null, M: null, fitMs: 0,
+  byTeam: new Map(), selectable: [], ref: { att: 0, dfn: 0 }, strength: new Map(),
+  home: null, away: null, neutral: false, fixFilter: 'all', rankFilter: 'all',
+  status: { kind: '', key: 'stLoading', vars: null }, loading: { key: 'ldFetch', vars: null },
+  bt: null, worker: null, btToken: 0,
+};
+const $ = id => document.getElementById(id);
+
+function setStatus(kind, key, vars) { S.status = { kind, key, vars }; renderStatus(); }
+function renderStatus() {
+  const el = $('status'); el.className = 'status' + (S.status.kind ? ' ' + S.status.kind : '');
+  const v = S.status.vars ? S.status.vars() : null;
+  $('status-text').innerHTML = th(S.status.key, v);
+}
+function setLoading(key, vars) { S.loading = { key, vars }; renderLoading(); }
+function renderLoading() { $('loading-text').textContent = tx(S.loading.key, S.loading.vars); }
+
+async function boot() {
+  $('reload').disabled = true;
+  S.M = null;
+  setStatus('', 'stLoading');
+  $('loading').hidden = false;
+  $('result').querySelectorAll(':scope > :not(#loading)').forEach(e => e.remove());
+  setLoading('ldFetch');
+  let data;
+  try {
+    data = await loadData((d, n) => {
+      $('loading-bar').style.width = (100 * d / n) + '%';
+      setLoading('ldFetchN', { d, n });
+    });
+  } catch (e) { data = null; }
+  if (!data || !data.curFiles.length || !data.played.length) { showError(); return; }
+  mergeSnapshot(data, await loadSnapshot());
+  S.data = data;
+  setLoading('ldTrain', { n: fmtInt(data.played.length) });
+  await new Promise(r => setTimeout(r, 30));
+
+  S.TI = teamIndex(data.played, data.teamLeague.keys());
+  const t0 = performance.now();
+  S.M = fitModel(data.played, todayDay() + 1, S.TI, null);
+  S.fitMs = performance.now() - t0;
+
+  // per-team history, newest first
+  S.byTeam = new Map();
+  for (let k = data.played.length - 1; k >= 0; k--) {
+    const r = data.played[k];
+    for (const t of [r.h, r.a]) { if (!S.byTeam.has(t)) S.byTeam.set(t, []); S.byTeam.get(t).push(r); }
+  }
+  // selectable teams = teams in this season's league files that the model knows
+  S.selectable = [...data.teamLeague.entries()]
+    .filter(([t]) => S.TI.idx.has(t))
+    .map(([t, lg]) => ({ name: t, short: shortName(t), league: lg, key: fold(t + ' ' + shortName(t)) }));
+  // reference opponent = average top-flight team
+  let sa = 0, sd = 0, cnt = 0;
+  for (const t of S.selectable) if (LG[t.league] && LG[t.league].top) { const i = S.TI.idx.get(t.name); sa += S.M.att[i]; sd += S.M.dfn[i]; cnt++; }
+  S.ref = { att: sa / Math.max(1, cnt), dfn: sd / Math.max(1, cnt) };
+  S.strength = new Map();
+  for (const t of S.selectable) {
+    const i = S.TI.idx.get(t.name);
+    const xg = Math.exp(S.M.mu + S.M.att[i] - S.ref.dfn), xga = Math.exp(S.M.mu + S.ref.att - S.M.dfn[i]);
+    S.strength.set(t.name, { xg, xga, net: xg - xga, rating: S.M.att[i] + S.M.dfn[i] });
+  }
+  const ranked = [...S.selectable].sort((a, b) => S.strength.get(b.name).rating - S.strength.get(a.name).rating);
+  ranked.forEach((t, k) => { S.strength.get(t.name).rank = k + 1; });
+  const perLeague = new Map();
+  for (const t of ranked) { const n = (perLeague.get(t.league) || 0) + 1; perLeague.set(t.league, n); S.strength.get(t.name).lrank = n; }
+
+  S.lastDay = data.played.filter(r => !r.cup && r.season === data.cur).reduce((m, r) => Math.max(m, r.day), 0);
+  buildTables();
+  // openfootball is always used (fetched live); the snapshot lists it as well, so it is not counted twice
+  const srcOk = 1 + (data.snap ? Object.entries(data.snap.sources || {}).filter(([k, s]) => k !== 'openfootball' && s && s.ok !== false).length : 0);
+  setStatus('live', 'stLive3', () => ({ date: fmtDay(S.lastDay, { day: 'numeric', month: 'short', year: 'numeric' }), n: fmtInt(data.played.length), src: srcOk, ms: fmtInt(S.fitMs) }));
+
+  if (!S.home || !S.TI.idx.has(S.home) || !S.away || !S.TI.idx.has(S.away)) pickDefault();
+  $('loading').hidden = true;
+  ['in-home', 'in-away', 'swap'].forEach(id => { $(id).disabled = false; });
+  renderPicker(); renderResult(); renderStandings(); renderFixtures(); renderRanking(); renderMethod();
+  ['tbl-sec', 'fixtures-sec', 'rank-sec', 'acc-sec', 'method-sec'].forEach(id => { $(id).hidden = false; });
+  $('reload').disabled = false;
+  runBacktest();
+}
+
+// League tables (official from the snapshot, else computed from results), each team's table
+// position, and this season's xG per match.
+function buildTables() {
+  const d = S.data;
+  S.tables = {}; S.tablePos = new Map(); S.xgSeason = new Map();
+  for (const l of LEAGUES) {
+    const off = d.standings[l.code];
+    let rows;
+    if (off && off.table && off.table.length) {
+      rows = off.table.map(r => Object.assign({}, r));
+    } else {
+      const acc = new Map();
+      for (const r of d.played) {
+        if (r.cup || r.comp !== l.code || r.season !== d.cur) continue;
+        for (const [t, gf, ga] of [[r.h, r.hg, r.ag], [r.a, r.ag, r.hg]]) {
+          if (!acc.has(t)) acc.set(t, { team: t, p: 0, w: 0, d: 0, l: 0, gf: 0, ga: 0 });
+          const x = acc.get(t); x.p++; x.gf += gf; x.ga += ga;
+          if (gf > ga) x.w++; else if (gf === ga) x.d++; else x.l++;
+        }
+      }
+      for (const [t, lg] of d.teamLeague) if (lg === l.code && !acc.has(t)) acc.set(t, { team: t, p: 0, w: 0, d: 0, l: 0, gf: 0, ga: 0 });
+      rows = [...acc.values()].map(x => Object.assign(x, { gd: x.gf - x.ga, pts: 3 * x.w + x.d }))
+        .sort((a, b) => b.pts - a.pts || b.gd - a.gd || b.gf - a.gf || a.team.localeCompare(b.team));
+      rows.forEach((x, k) => { x.pos = k + 1; });
+    }
+    S.tables[l.code] = { official: !!(off && off.table && off.table.length), updated: off && off.updated, rows };
+    for (const r of rows) S.tablePos.set(r.team, { pos: r.pos, pts: r.pts, league: l.code });
+  }
+  for (const r of d.played) {
+    if (r.cup || r.season !== d.cur || r.xh === undefined) continue;
+    for (const [t, f, a] of [[r.h, r.xh, r.xa], [r.a, r.xa, r.xh]]) {
+      if (!S.xgSeason.has(t)) S.xgSeason.set(t, { f: 0, a: 0, n: 0 });
+      const x = S.xgSeason.get(t); x.f += f; x.a += a; x.n++;
+    }
+  }
+}
+
+function showError() {
+  setStatus('bad', 'stBad');
+  $('loading').hidden = true;
+  const box = document.createElement('div');
+  box.className = 'error';
+  box.innerHTML = `<h3>${esc(tx('errTitle'))}</h3><p>${esc(tx('errBody'))}</p><button class="icon-btn" type="button" id="retry">${esc(tx('retry'))}</button>`;
+  $('result').appendChild(box);
+  $('retry').addEventListener('click', boot);
+  $('reload').disabled = false;
+}
+
+function pickDefault() {
+  const today = todayDay();
+  let best = null, bestScore = -Infinity;
+  for (const f of S.data.fixtures) {
+    if (f.day < today || f.day > today + 7) continue;
+    const a = S.strength.get(f.h), b = S.strength.get(f.a);
+    if (!a || !b) continue;
+    const s = a.rating + b.rating - Math.abs(a.rating - b.rating) * 0.5;
+    if (s > bestScore) { bestScore = s; best = f; }
+  }
+  if (best) { S.home = best.h; S.away = best.a; return; }
+  const ranked = [...S.selectable].sort((a, b) => S.strength.get(b.name).rating - S.strength.get(a.name).rating);
+  const first = ranked[0];
+  const second = ranked.find(t => t.league === first.league && t.name !== first.name) || ranked[1];
+  S.home = first.name; S.away = second.name;
+}
+
+/* ==================================================================
+   PICKER (combobox)
+   ================================================================== */
+function setupCombo(side) {
+  const input = $(side === 'home' ? 'in-home' : 'in-away');
+  const list = $(side === 'home' ? 'list-home' : 'list-away');
+  let opts = [], active = -1;
+  const close = () => { list.hidden = true; input.setAttribute('aria-expanded', 'false'); active = -1; };
+  const choose = name => {
+    S[side] = name; close(); input.value = shortName(name); input.title = name; renderResult();
+  };
+  const render = () => {
+    if (!S.M) return;
+    const q = fold(input.value.trim());
+    let pool = S.selectable;
+    if (q) {
+      pool = pool.filter(t => t.key.includes(q))
+        .sort((a, b) => (fold(b.short).startsWith(q) - fold(a.short).startsWith(q)) || a.short.localeCompare(b.short));
+    }
+    const groups = new Map();
+    for (const t of pool) { if (!groups.has(t.league)) groups.set(t.league, []); groups.get(t.league).push(t); }
+    let html = ''; opts = [];
+    for (const l of DISPLAY_COMPS) {
+      const ts = groups.get(l.code); if (!ts) continue;
+      if (!q) ts.sort((a, b) => S.strength.get(b.name).rating - S.strength.get(a.name).rating);
+      html += `<li class="grp" role="presentation">${esc(l.code === UCL ? tx('grpUcl') : leagueName(l.code))}</li>`;
+      for (const t of ts) {
+        const id = `${side}-opt-${opts.length}`;
+        opts.push({ id, name: t.name });
+        html += `<li class="opt" role="option" id="${id}" data-name="${esc(t.name)}" aria-selected="false"><span dir="auto">${esc(t.short)}</span><small>#${S.strength.get(t.name).lrank} ${esc(l.short)}</small></li>`;
+      }
+    }
+    list.innerHTML = html || `<li class="none">${esc(tx('noMatch'))}</li>`;
+    list.hidden = false; input.setAttribute('aria-expanded', 'true');
+    active = opts.length ? 0 : -1; mark();
+  };
+  const mark = () => {
+    list.querySelectorAll('.opt').forEach((li, k) => li.setAttribute('aria-selected', k === active ? 'true' : 'false'));
+    if (active >= 0) {
+      input.setAttribute('aria-activedescendant', opts[active].id);
+      const li = $(opts[active].id); if (li) li.scrollIntoView({ block: 'nearest' });
+    } else input.removeAttribute('aria-activedescendant');
+  };
+  input.addEventListener('focus', () => { input.select(); render(); });
+  input.addEventListener('input', render);
+  input.addEventListener('keydown', e => {
+    if (e.key === 'ArrowDown') { e.preventDefault(); if (list.hidden) render(); else { active = Math.min(opts.length - 1, active + 1); mark(); } }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); active = Math.max(0, active - 1); mark(); }
+    else if (e.key === 'Enter') { if (!list.hidden && active >= 0) { e.preventDefault(); choose(opts[active].name); input.blur(); } }
+    else if (e.key === 'Escape') { close(); input.value = S[side] ? shortName(S[side]) : ''; }
+  });
+  list.addEventListener('mousedown', e => {
+    const li = e.target.closest('.opt'); if (!li) return;
+    e.preventDefault(); choose(li.dataset.name); input.blur();
+  });
+  input.addEventListener('blur', () => { setTimeout(() => { close(); input.value = S[side] ? shortName(S[side]) : ''; }, 120); });
+}
+
+function renderPicker() {
+  $('in-home').value = shortName(S.home); $('in-home').title = S.home;
+  $('in-away').value = shortName(S.away); $('in-away').title = S.away;
+  $('neutral').checked = S.neutral;
+}
+
+/* ==================================================================
+   RESULT
+   ================================================================== */
+function formOf(team, n) {
+  const out = [];
+  for (const r of S.byTeam.get(team) || []) {
+    const isH = r.h === team, gf = isH ? r.hg : r.ag, ga = isH ? r.ag : r.hg;
+    out.push({ r, isH, gf, ga, res: gf > ga ? 'w' : gf === ga ? 'd' : 'l', opp: isH ? r.a : r.h });
+    if (out.length >= n) break;
+  }
+  return out;
+}
+const formLetter = res => tx(res === 'w' ? 'fW' : res === 'd' ? 'fD' : 'fL');
+const compLabel = r => (r.cup ? tx('ucl') : leagueName(r.comp));
+
+function renderResult() {
+  const box = $('result');
+  box.querySelectorAll(':scope > :not(#loading)').forEach(e => e.remove());
+  if (!S.M) return;
+  const H = S.home, A = S.away;
+  const div = document.createElement('div');
+  if (!H || !A || H === A) {
+    div.className = 'empty'; div.style.padding = '18px 4px';
+    div.textContent = tx(H === A ? 'pickTwo' : 'pickBoth');
+    box.appendChild(div); return;
+  }
+  const hi = S.TI.idx.get(H), ai = S.TI.idx.get(A);
+  const lgH = S.data.teamLeague.get(H), lgA = S.data.teamLeague.get(A);
+  const P = predict(S.M, hi, ai, lgH, S.neutral);
+  const sh = shortName(H), sa = shortName(A);
+  const max = Math.max(P.pH, P.pD, P.pA);
+  let head, bigCls, bigP;
+  if (max === P.pH) { head = `<span dir="auto">${esc(sh)}</span><small>${esc(tx(S.neutral ? 'favNeutral' : 'favHome'))}</small>`; bigCls = 'var(--home)'; bigP = P.pH; }
+  else if (max === P.pA) { head = `<span dir="auto">${esc(sa)}</span><small>${esc(tx(S.neutral ? 'favNeutral' : 'favAway'))}</small>`; bigCls = 'var(--away)'; bigP = P.pA; }
+  else { head = `${esc(tx('draw'))}<small>${esc(tx('drawLikely'))}</small>`; bigCls = 'var(--draw)'; bigP = P.pD; }
+
+  const badges = [];
+  if (lgH !== lgA) badges.push(`<span class="badge warn" title="${esc(tx('crossLeagueTip'))}">${esc(tx('crossLeague'))}</span>`);
+  if (!S.neutral) badges.push(`<span class="badge">${th('homeAdv', { league: leagueName(lgH), x: dec((Math.exp(homeAdv(S.M, lgH)) - 1) * 100, 0) })}</span>`);
+  const nH = (S.byTeam.get(H) || []).filter(r => S.lastDay - r.day < 365).length;
+  const nA = (S.byTeam.get(A) || []).filter(r => S.lastDay - r.day < 365).length;
+  if (Math.min(nH, nA) < 15) {
+    const few = nH <= nA ? sh : sa;
+    badges.push(`<span class="badge warn" title="${esc(tx('fewDataTip'))}">${th('fewData', { team: few, n: Math.min(nH, nA) })}</span>`);
+  }
+
+  const maxCell = Math.max(...Array.from({ length: 6 }, (_, i) => Math.max(...Array.from(P.grid[i]).slice(0, 6))));
+  let grid = `<div class="ax"></div>` + [0, 1, 2, 3, 4, 5].map(j => `<div class="ax">${j}</div>`).join('');
+  for (let i = 0; i <= 5; i++) {
+    grid += `<div class="ax">${i}</div>`;
+    for (let j = 0; j <= 5; j++) {
+      const p = P.grid[i][j];
+      const col = i > j ? 'var(--home)' : i === j ? 'var(--draw)' : 'var(--away)';
+      const mix = Math.round(6 + 80 * (p / maxCell));
+      const strong = mix > 52;
+      const isTop = P.top[0].i === i && P.top[0].j === j;
+      grid += `<div class="cell${isTop ? ' best' : ''}" style="background:color-mix(in srgb, ${col} ${mix}%, var(--surface));color:${strong ? 'var(--on-strong)' : 'var(--ink)'}" title="${esc(sh)} ${esc(score(i, j))} ${esc(sa)}: ${esc(pct1(p))}">${p >= 0.0095 ? Math.round(p * 100) : p >= 0.001 ? '·' : ''}</div>`;
+    }
+  }
+
+  const fH = formOf(H, 5), fA = formOf(A, 5);
+  const all = [...S.strength.values()];
+  const maxXg = Math.max(...all.map(s => s.xg)), maxXga = Math.max(...all.map(s => s.xga));
+  const teamCard = (name, side, f) => {
+    const st = S.strength.get(name); const lg = S.data.teamLeague.get(name);
+    const chips = f.map(x => `<span class="chip ${x.res}" title="${esc(tx('chipTitle', { date: fmtDay(x.r.day, { day: 'numeric', month: 'short', year: 'numeric' }), comp: compLabel(x.r), venue: tx(x.isH ? 'homeWord' : 'awayWord'), opp: shortName(x.opp), score: score(x.gf, x.ga) }))}">${esc(formLetter(x.res))}</span>`).join('');
+    const lastM = f[0];
+    const col = side === 'h' ? 'var(--home)' : 'var(--away)';
+    const tp = S.tablePos.get(name), xs = S.xgSeason.get(name);
+    const extraMeta = (tp ? th('teamTable', { pos: tp.pos, pts: tp.pts }) : '')
+      + (xs && xs.n ? (tp ? ' · ' : '') + th('teamXg', { f: dec(xs.f / xs.n), a: dec(xs.a / xs.n) }) : '');
+    return `<article class="team ${side}">
+      <h4 title="${esc(name)}" dir="auto">${esc(shortName(name))}</h4>
+      <div class="meta">${th('teamMeta', { league: leagueName(lg), lr: st.lrank, r: st.rank, n: S.selectable.length })}</div>
+      ${extraMeta ? `<div class="meta">${extraMeta}</div>` : ''}
+      <div class="rating">
+        <span>${esc(tx('attack'))}</span><div class="track"><div class="fill" style="width:${(100 * st.xg / maxXg).toFixed(1)}%;background:${col}"></div></div><span class="n">${esc(tx('goals', { x: dec(st.xg) }))}</span>
+        <span>${esc(tx('conceded'))}</span><div class="track"><div class="fill" style="width:${(100 * st.xga / maxXga).toFixed(1)}%;background:var(--loss)"></div></div><span class="n">${esc(tx('goals', { x: dec(st.xga) }))}</span>
+      </div>
+      <div class="form" aria-label="${esc(tx('formAria'))}">${chips || `<span class="empty">${esc(tx('noMatches'))}</span>`}</div>
+      ${lastM ? `<div class="lastline">${th('last', { vs: tx(lastM.isH ? 'vsHome' : 'vsAway'), opp: shortName(lastM.opp), score: score(lastM.gf, lastM.ga), date: fmtDay(lastM.r.day, { day: 'numeric', month: 'short' }), comp: compLabel(lastM.r) })}</div>` : ''}
+    </article>`;
+  };
+
+  const h2h = [];
+  for (const r of S.byTeam.get(H) || []) { if ((r.h === H && r.a === A) || (r.h === A && r.a === H)) h2h.push(r); if (h2h.length >= 6) break; }
+  const h2hRows = h2h.map(r => `<tr><td class="dt">${esc(fmtDay(r.day, { day: 'numeric', month: 'short', year: 'numeric' }))}</td><td class="hm" dir="auto">${esc(shortName(r.h))}</td><td class="sc">${esc(score(r.hg, r.ag))}</td><td dir="auto">${esc(shortName(r.a))}</td><td class="dt">${esc(compLabel(r))}</td></tr>`).join('');
+  const X = tx('drawSym');
+
+  // bookmaker consensus for this exact fixture (home/away as the market lists it)
+  const mk = !S.neutral && S.data.odds ? S.data.odds.get(`${H}|${A}`) : null;
+  let market = '';
+  if (mk) {
+    const dif = [P.pH - mk.p[0], P.pD - mk.p[1], P.pA - mk.p[2]].map(v => (v >= 0 ? '+' : '−') + dec(Math.abs(v) * 100, 0));
+    market = `<div class="market">
+      <div class="row"><span class="eyebrow">${esc(tx('mktTitle', { n: mk.n }))}</span><span class="diff" dir="ltr">${esc(tx('mktDiff'))}: 1 ${dif[0]} · ${esc(X)} ${dif[1]} · 2 ${dif[2]}</span></div>
+      <div class="track"><span class="seg-h" style="flex-basis:${(mk.p[0] * 100).toFixed(1)}%"></span><span class="seg-x" style="flex-basis:${(mk.p[1] * 100).toFixed(1)}%"></span><span class="seg-a" style="flex-basis:${(mk.p[2] * 100).toFixed(1)}%"></span></div>
+      <div class="row"><span>1 ${esc(pct(mk.p[0]))} · <b>${esc(dec(mk.best[0]))}</b></span><span>${esc(X)} ${esc(pct(mk.p[1]))} · <b>${esc(dec(mk.best[1]))}</b></span><span>2 ${esc(pct(mk.p[2]))} · <b>${esc(dec(mk.best[2]))}</b></span></div>
+      <div class="note">${esc(tx('mktBest'))}: <b>${esc(dec(mk.best[0]))} / ${esc(dec(mk.best[1]))} / ${esc(dec(mk.best[2]))}</b>. ${esc(tx('mktNote'))}</div>
+    </div>`;
+  }
+
+  div.innerHTML = `
+    <div class="result">
+      <div class="card">
+        <div class="verdict">
+          <h3>${head}</h3>
+          <div class="big" style="color:${bigCls}">${esc(pct(bigP))}</div>
+        </div>
+        <div class="badges">${badges.join('')}</div>
+        <div class="bar">
+          <div class="bar-track" role="img" aria-label="${esc(tx('barAria', { h: sh, ph: pct(P.pH), pd: pct(P.pD), a: sa, pa: pct(P.pA) }))}">
+            <span class="seg-h" style="flex-basis:${(P.pH * 100).toFixed(2)}%"></span><span class="seg-x" style="flex-basis:${(P.pD * 100).toFixed(2)}%"></span><span class="seg-a" style="flex-basis:${(P.pA * 100).toFixed(2)}%"></span>
+          </div>
+          <div class="outcomes">
+            <div class="outcome h"><div class="who">1 · ${th('winOf', { team: sh })}</div><div class="p">${esc(pct(P.pH))}</div><div class="odds">${esc(tx('fairOdds'))} <b>${esc(odds(P.pH))}</b></div></div>
+            <div class="outcome x"><div class="who">${esc(X)} · ${esc(tx('draw'))}</div><div class="p">${esc(pct(P.pD))}</div><div class="odds">${esc(tx('fairOdds'))} <b>${esc(odds(P.pD))}</b></div></div>
+            <div class="outcome a"><div class="who">2 · ${th('winOf', { team: sa })}</div><div class="p">${esc(pct(P.pA))}</div><div class="odds">${esc(tx('fairOdds'))} <b>${esc(odds(P.pA))}</b></div></div>
+          </div>
+        </div>
+        <div class="stats">
+          <div class="stat"><div class="k">${esc(tx('xg'))}</div><div class="v" dir="ltr">${esc(dec(P.lam))} – ${esc(dec(P.nu))}</div></div>
+          <div class="stat"><div class="k">${esc(tx('over25'))}</div><div class="v">${esc(pct(P.o25))}</div></div>
+          <div class="stat"><div class="k">${esc(tx('btts'))}</div><div class="v">${esc(pct(P.btts))}</div></div>
+          <div class="stat"><div class="k">${th('cleanSheet', { h: sh, a: sa })}</div><div class="v">${esc(pct(P.csH))} · ${esc(pct(P.csA))}</div></div>
+        </div>
+        ${market}
+      </div>
+      <div class="card">
+        <div class="eyebrow">${esc(tx('scoreTitle'))}</div>
+        <div class="grid-cap"><span>${th('goalsHome', { team: sh })}</span><span>${th('goalsAway', { team: sa })}</span></div>
+        <div class="grid-wrap"><div class="scoregrid" role="img" aria-label="${esc(tx('gridAria'))}">${grid}</div></div>
+        <div class="toplist">${P.top.slice(0, 6).map(t => `<div><span>${esc(score(t.i, t.j))}</span><b>${esc(pct1(t.p))}</b></div>`).join('')}</div>
+      </div>
+    </div>
+    <div class="teams">${teamCard(H, 'h', fH)}${teamCard(A, 'a', fA)}</div>
+    <div class="h2h">
+      <div class="eyebrow" style="margin-bottom:6px;">${th('h2hTitle', { season: seasonLabel(S.data.seasons[2]) })}</div>
+      ${h2hRows ? `<div class="table-wrap"><table>${h2hRows}</table></div>` : `<div class="empty">${esc(tx('h2hNone'))}</div>`}
+    </div>`;
+  box.appendChild(div);
+  $('pick-hint').dataset.set = '1';
+  $('pick-hint').textContent = tx('hintOdds', { n: fmtInt(S.M.n) });
+}
+
+/* ==================================================================
+   FIXTURES
+   ================================================================== */
+function filterChips(el, current, onPick, counts) {
+  const items = [{ code: 'all', label: tx('all') }].concat((counts ? DISPLAY_COMPS : LEAGUES).filter(l => !counts || counts.get(l.code)).map(l => ({ code: l.code, label: leagueName(l.code) })));
+  el.innerHTML = items.map(i => `<button type="button" class="fchip" data-code="${i.code}" aria-pressed="${i.code === current}">${esc(i.label)}</button>`).join('');
+  el.onclick = e => { const b = e.target.closest('.fchip'); if (b) onPick(b.dataset.code); };
+}
+
+function renderFixtures() {
+  const today = todayDay();
+  const up = S.data.fixtures.filter(f => f.day >= today && S.TI.idx.has(f.h) && S.TI.idx.has(f.a));
+  const week = up.filter(f => f.day <= today + 7);
+  const list0 = week.length ? week : up.slice(0, 40);
+  $('fix-sub').textContent = tx(week.length ? 'fixSubWeek' : 'fixSubNext');
+  const counts = new Map(); for (const f of list0) counts.set(f.comp, (counts.get(f.comp) || 0) + 1);
+  if (S.fixFilter !== 'all' && !counts.get(S.fixFilter)) S.fixFilter = 'all';
+  filterChips($('fix-filter'), S.fixFilter, code => { S.fixFilter = code; renderFixtures(); }, counts);
+  const list = list0.filter(f => S.fixFilter === 'all' || f.comp === S.fixFilter);
+  if (!list.length) { $('fixtures').innerHTML = `<div class="empty" style="padding:14px 18px">${esc(tx('fixNone'))}</div>`; return; }
+  let html = '', lastDay = null;
+  for (const f of list) {
+    if (f.day !== lastDay) { html += `<div class="fday eyebrow">${esc(fmtDay(f.day, { weekday: 'long', day: 'numeric', month: 'long' }))}</div>`; lastDay = f.day; }
+    const P = predict(S.M, S.TI.idx.get(f.h), S.TI.idx.get(f.a), f.comp, false);
+    const mx = Math.max(P.pH, P.pD, P.pA);
+    const mk = S.data.odds.get(`${f.h}|${f.a}`);
+    html += `<button type="button" class="frow" data-h="${esc(f.h)}" data-a="${esc(f.a)}" aria-label="${esc(tx('fixRowAria', { h: shortName(f.h), a: shortName(f.a), ph: pct(P.pH), pd: pct(P.pD), pa: pct(P.pA) }))}">
+      <span class="t">${esc(f.time || '—')}</span>
+      <span class="lg">${esc(lgShort(f.comp))}</span>
+      <span class="hn" title="${esc(f.h)}" dir="auto">${esc(shortName(f.h))}</span>
+      <span class="mini"><span class="track"><span class="seg-h" style="flex-basis:${(P.pH * 100).toFixed(1)}%"></span><span class="seg-x" style="flex-basis:${(P.pD * 100).toFixed(1)}%"></span><span class="seg-a" style="flex-basis:${(P.pA * 100).toFixed(1)}%"></span></span>
+        <span class="nums"><span class="${mx === P.pH ? 'fav' : ''}">${esc(pct(P.pH))}</span><span class="${mx === P.pD ? 'fav' : ''}">${esc(pct(P.pD))}</span><span class="${mx === P.pA ? 'fav' : ''}">${esc(pct(P.pA))}</span></span>
+        ${mk ? `<span class="mkt-line nums"><span>${esc(tx('mktShort'))} ${esc(pct(mk.p[0]))}</span><span>${esc(pct(mk.p[1]))}</span><span>${esc(pct(mk.p[2]))}</span></span>` : ''}</span>
+      <span class="an" title="${esc(f.a)}" dir="auto">${esc(shortName(f.a))}</span>
+    </button>`;
+  }
+  $('fixtures').innerHTML = html;
+  $('fixtures').onclick = e => {
+    const b = e.target.closest('.frow'); if (!b) return;
+    S.home = b.dataset.h; S.away = b.dataset.a; S.neutral = false;
+    renderPicker(); renderResult();
+    document.querySelector('.predictor').scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
+  };
+}
+
+/* ==================================================================
+   STANDINGS (official table next to the model's strength rank)
+   ================================================================== */
+function renderStandings() {
+  const lgs = LEAGUES.filter(l => S.tables[l.code] && S.tables[l.code].rows.length);
+  if (!lgs.length) { $('tbl-sec').hidden = true; return; }
+  if (!S.tblLeague || !lgs.some(l => l.code === S.tblLeague)) {
+    const h = S.home && S.data.teamLeague.get(S.home);
+    S.tblLeague = lgs.some(l => l.code === h) ? h : lgs[0].code;
+  }
+  $('tbl-filter').innerHTML = lgs.map(l => `<button type="button" class="fchip" data-code="${l.code}" aria-pressed="${l.code === S.tblLeague}">${esc(leagueName(l.code))}</button>`).join('');
+  $('tbl-filter').onclick = e => { const b = e.target.closest('.fchip'); if (b) { S.tblLeague = b.dataset.code; renderStandings(); } };
+  const T = S.tables[S.tblLeague];
+  $('tbl-sub').textContent = tx(T.official ? 'tblSubOfficial' : 'tblSubComputed');
+  const wdl = `${tx('fW')}-${tx('fD')}-${tx('fL')}`;
+  const body = T.rows.map(r => {
+    const st = S.strength.get(r.team), xs = S.xgSeason.get(r.team);
+    const mr = st ? st.lrank : null;
+    const cls = mr === null ? '' : mr < r.pos ? 'up' : mr > r.pos ? 'down' : '';
+    const xgd = xs && xs.n ? (xs.f - xs.a) / xs.n : null;
+    const form = formOf(r.team, 5).map(x => `<span class="chip sm ${x.res}">${esc(formLetter(x.res))}</span>`).join('');
+    const me = r.team === S.home || r.team === S.away;
+    return `<tr class="pick${me ? ' me' : ''}" data-name="${esc(r.team)}" tabindex="0" title="${esc(tx('rankRowTitle', { team: shortName(r.team) }))}">
+      <td class="pos">${r.pos}</td>
+      <td dir="auto"><b>${esc(shortName(r.team))}</b></td>
+      <td class="r num">${r.p}</td>
+      <td class="c num">${r.w}-${r.d}-${r.l}</td>
+      <td class="c num">${r.gf}:${r.ga}</td>
+      <td class="r num" dir="ltr">${r.gd > 0 ? '+' : r.gd < 0 ? '−' : ''}${Math.abs(r.gd)}</td>
+      <td class="r num" dir="ltr">${xgd === null ? '—' : (xgd >= 0 ? '+' : '−') + esc(dec(Math.abs(xgd)))}</td>
+      <td class="r"><span class="mdl ${cls}">${mr === null ? '—' : '#' + mr}</span></td>
+      <td><div style="display:flex;gap:3px">${form}</div></td>
+      <td class="r pts">${r.pts}</td>
+    </tr>`;
+  }).join('');
+  const hasXg = T.rows.some(r => S.xgSeason.has(r.team));
+  $('tbl').innerHTML = `<table class="tbl">
+    <thead><tr><th>#</th><th>${esc(tx('thTeam'))}</th><th class="r">${esc(tx('thMP'))}</th><th class="c">${esc(wdl)}</th><th class="c">${esc(tx('thGoals'))}</th><th class="r">${esc(tx('thGD'))}</th>
+      <th class="r" title="${esc(tx('thXgdTip'))}">${esc(tx('thXgd'))}</th><th class="r" title="${esc(tx('thModelTip'))}">${esc(tx('thModel'))}</th><th>${esc(tx('thForm'))}</th><th class="r">${esc(tx('thPts'))}</th></tr></thead>
+    <tbody>${body}</tbody></table>
+    <div class="tbl-foot">${esc(tx('thModelTip'))}${hasXg ? ' ' + esc(tx('thXgdTip')) : ''}</div>`;
+  const use = tr => {
+    const name = tr.dataset.name;
+    if (!S.home || S.home === name) S.away = name; else if (S.away !== name) { S.away = S.home; S.home = name; }
+    renderPicker(); renderResult(); renderStandings();
+    document.querySelector('.predictor').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+  $('tbl').onclick = e => { const tr = e.target.closest('tr.pick'); if (tr) use(tr); };
+  $('tbl').onkeydown = e => { if (e.key === 'Enter') { const tr = e.target.closest('tr.pick'); if (tr) use(tr); } };
+}
+
+/* ==================================================================
+   RANKING
+   ================================================================== */
+function renderRanking() {
+  filterChips($('rank-filter'), S.rankFilter, code => { S.rankFilter = code; renderRanking(); });
+  const rows = S.selectable
+    .filter(t => S.rankFilter === 'all' ? !!(LG[t.league] && LG[t.league].top) : t.league === S.rankFilter)
+    .sort((a, b) => S.strength.get(b.name).rating - S.strength.get(a.name).rating)
+    .slice(0, S.rankFilter === 'all' ? 30 : 40);
+  const body = rows.map((t, k) => {
+    const s = S.strength.get(t.name);
+    const f = formOf(t.name, 5).map(x => `<span class="chip sm ${x.res}">${esc(formLetter(x.res))}</span>`).join('');
+    return `<tr class="pick" data-name="${esc(t.name)}" tabindex="0" title="${esc(tx('rankRowTitle', { team: t.short }))}">
+      <td class="num">${k + 1}</td>
+      <td dir="auto"><b>${esc(t.short)}</b></td>
+      <td><span class="lgtag">${esc(lgShort(t.league))}</span></td>
+      <td class="r"><span class="num">${esc(dec(s.xg))}</span></td>
+      <td class="r"><span class="num">${esc(dec(s.xga))}</span></td>
+      <td class="r"><span class="num gd ${s.net >= 0 ? 'pos' : 'neg'}" dir="ltr">${s.net >= 0 ? '+' : '−'}${esc(dec(Math.abs(s.net)))}</span></td>
+      <td><div style="display:flex;gap:3px">${f}</div></td>
+    </tr>`;
+  }).join('');
+  $('rank-table').innerHTML = `<thead><tr><th>#</th><th>${esc(tx('thTeam'))}</th><th>${esc(tx('thLeague'))}</th><th class="r">${esc(tx('thAttack'))}</th><th class="r">${esc(tx('thConceded'))}</th><th class="r">${esc(tx('thDiff'))}</th><th>${esc(tx('thForm'))}</th></tr></thead><tbody>${body}</tbody>`;
+  const use = tr => {
+    const name = tr.dataset.name;
+    if (!S.home || S.home === name) S.away = name; else if (S.away !== name) { S.away = S.home; S.home = name; }
+    renderPicker(); renderResult();
+    document.querySelector('.predictor').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+  $('rank-table').onclick = e => { const tr = e.target.closest('tr.pick'); if (tr) use(tr); };
+  $('rank-table').onkeydown = e => { if (e.key === 'Enter') { const tr = e.target.closest('tr.pick'); if (tr) use(tr); } };
+}
+
+/* ==================================================================
+   BACKTEST (walk-forward, in a Web Worker)
+   ================================================================== */
+// Pure and synchronous, so it can run unchanged inside a Web Worker (it is serialised
+// together with fitModel/predict below). onWeek(done, total) reports progress.
+function walkForward(played, TI, evalComps, startDay, endDay, onWeek) {
+  const out = { n: 0, ll: 0, base: 0, brier: 0, acc: 0, home: 0, bins: Array.from({ length: 10 }, () => ({ n: 0, p: 0, hit: 0 })) };
+  let init = null;
+  const first = mondayOf(startDay);
+  const weeks = Math.max(1, Math.ceil((endDay - first) / 7));
+  for (let w = 0, wk = first; wk < endDay; wk += 7, w++) {
+    const test = played.filter(r => r.day >= wk && r.day < wk + 7 && evalComps.has(r.comp) && TI.idx.has(r.h) && TI.idx.has(r.a));
+    if (test.length) {
+      const M = fitModel(played, wk, TI, init); init = M;
+      let bh = 0, bd = 0, ba = 0;
+      for (const r of played) { if (r.day >= wk) break; if (wk - r.day < 730 && evalComps.has(r.comp)) { if (r.hg > r.ag) bh++; else if (r.hg === r.ag) bd++; else ba++; } }
+      const bt = bh + bd + ba || 1; const base = [bh / bt, bd / bt, ba / bt];
+      for (const r of test) {
+        const P = predict(M, TI.idx.get(r.h), TI.idx.get(r.a), r.comp, false);
+        const pv = [P.pH, P.pD, P.pA];
+        const o = r.hg > r.ag ? 0 : r.hg === r.ag ? 1 : 2;
+        out.ll -= Math.log(Math.max(pv[o], 1e-12)); out.base -= Math.log(Math.max(base[o], 1e-12));
+        let b = 0; for (let k = 0; k < 3; k++) b += (pv[k] - (k === o ? 1 : 0)) ** 2; out.brier += b;
+        if (pv.indexOf(Math.max(...pv)) === o) out.acc++;
+        if (o === 0) out.home++;
+        for (let k = 0; k < 3; k++) { const bi = Math.min(9, Math.floor(pv[k] * 10)); out.bins[bi].n++; out.bins[bi].p += pv[k]; out.bins[bi].hit += k === o ? 1 : 0; }
+        out.n++;
+      }
+    }
+    onWeek(w + 1, weeks);
+  }
+  return out;
+}
+
+// The walk-forward refits the model once per week of two seasons - tens of fits. In a worker
+// the page stays responsive while it runs; if a worker cannot start, it runs here instead.
+function backtestWorker() {
+  const src = `'use strict';
+const CFG = ${JSON.stringify(CFG)};
+const MAXG = ${MAXG};
+const mondayOf = ${mondayOf.toString()};
+${fitModel.toString()}
+${poissonVec.toString()}
+${homeAdv.toString()}
+${predict.toString()}
+${walkForward.toString()}
+self.onmessage = e => {
+  const { played, teams, evalComps, windows } = e.data;
+  const TI = { teams, idx: new Map(teams.map((t, i) => [t, i])) };
+  const ev = new Set(evalComps);
+  for (const w of windows) {
+    const t0 = Date.now();
+    const r = walkForward(played, TI, ev, w.start, w.end, (d, n) => self.postMessage({ type: 'progress', key: w.key, d, n }));
+    r.ms = Date.now() - t0;
+    self.postMessage({ type: 'done', key: w.key, r });
+  }
+  self.postMessage({ type: 'all' });
+};`;
+  return new Worker(URL.createObjectURL(new Blob([src], { type: 'text/javascript' })));
+}
+
+function runBacktest() {
+  const cur = S.data.cur, prev = prevSeason(cur), today = todayDay();
+  const windows = [
+    { key: 'cur', season: cur, subKey: 'accCurSub', start: seasonStart(cur), end: Math.min(today, seasonStart(cur) + 366) },
+    { key: 'prev', season: prev, subKey: 'accPrevSub', start: seasonStart(prev), end: seasonStart(cur) },
+  ];
+  const token = S.btToken = S.btToken + 1;
+  if (S.worker) { S.worker.terminate(); S.worker = null; }
+  S.bt = { windows, results: {}, progress: {}, done: false };
+  renderAccuracy();
+  const evalComps = LEAGUES.map(l => l.code);
+  const onDone = (key, r) => { S.bt.results[key] = r; S.bt.progress[key] = 1; renderAccCard(windows.find(w => w.key === key)); };
+  const finish = () => { S.bt.done = true; renderCalibration(); };
+  const inPage = async () => {
+    for (const w of windows) {
+      await new Promise(res => setTimeout(res, 0));
+      if (token !== S.btToken) return;
+      const t0 = performance.now();
+      const r = walkForward(S.data.played, S.TI, new Set(evalComps), w.start, w.end, () => {});
+      r.ms = performance.now() - t0;
+      onDone(w.key, r);
+    }
+    finish();
+  };
+  let worker = null;
+  try { worker = backtestWorker(); } catch (e) { worker = null; }
+  if (!worker) { inPage(); return; }
+  S.worker = worker;
+  worker.onmessage = e => {
+    if (token !== S.btToken) return;
+    const m = e.data;
+    if (m.type === 'progress') { S.bt.progress[m.key] = m.d / m.n; const bar = $(`accbar-${m.key}`); if (bar) bar.style.width = (100 * m.d / m.n) + '%'; }
+    else if (m.type === 'done') onDone(m.key, m.r);
+    else if (m.type === 'all') { finish(); worker.terminate(); S.worker = null; }
+  };
+  worker.onerror = e => { e.preventDefault(); worker.terminate(); S.worker = null; if (token === S.btToken) inPage(); };
+  worker.postMessage({ played: S.data.played, teams: S.TI.teams, evalComps, windows });
+}
+
+// Rebuilds the whole section from S.bt, so a language change mid-run loses nothing.
+function renderAccuracy() {
+  if (!S.bt) return;
+  $('acc').innerHTML = `<div class="acc-cards">${S.bt.windows.map(w => `<div class="acc-card" id="acc-${w.key}"></div>`).join('')}</div>
+    <div class="chart" id="acc-chart"></div>`;
+  S.bt.windows.forEach(renderAccCard);
+  renderCalibration();
+}
+
+function renderAccCard(w) {
+  const el = $(`acc-${w.key}`); if (!el) return;
+  const r = S.bt.results[w.key];
+  const title = `<h3>${th('season', { s: seasonLabel(w.season) })}</h3>`;
+  if (!r) {
+    const p = S.bt.progress[w.key] || 0;
+    el.innerHTML = `${title}<div class="sub">${esc(tx(w.subKey))}</div><div class="progress"><span id="accbar-${w.key}" style="width:${(100 * p).toFixed(1)}%"></span></div><div class="sub">${esc(tx(p > 0 ? 'testing' : 'waiting'))}</div>`;
+    return;
+  }
+  if (!r.n) { el.innerHTML = `${title}<div class="sub">${esc(tx('accNone'))}</div>`; return; }
+  const ll = r.ll / r.n, base = r.base / r.n, gain = (1 - ll / base) * 100;
+  el.innerHTML = `${title}<div class="sub">${esc(tx(w.subKey))} · ${esc(tx('accMeta', { n: fmtInt(r.n), s: dec(r.ms / 1000, 1) }))}</div>
+    <div class="kv">
+      <div><div class="k">${esc(tx('accTop'))}</div><div class="v">${esc(pct1(r.acc / r.n))}</div></div>
+      <div><div class="k">${esc(tx('accHome'))}</div><div class="v">${esc(pct1(r.home / r.n))}</div></div>
+      <div><div class="k">${esc(tx('accLL'))}</div><div class="v">${esc(dec(ll, 3))}</div></div>
+      <div><div class="k">${esc(tx('accBase'))}</div><div class="v">${esc(dec(base, 3))} <small>${esc(tx('accBaseNote'))}</small></div></div>
+      <div><div class="k">${esc(tx('accGain'))}</div><div class="v" style="color:${gain > 0 ? 'var(--win)' : 'var(--loss)'}" dir="ltr">${gain > 0 ? '+' : ''}${esc(dec(gain, 1))}%</div></div>
+    </div>`;
+}
+
+function renderCalibration() {
+  const el = $('acc-chart'); if (!el) return;
+  if (!S.bt.done) { el.innerHTML = `<div class="eyebrow">${esc(tx('calib'))}</div><div class="note" style="margin-top:8px">${esc(tx('calibWait'))}</div>`; return; }
+  const bins = Array.from({ length: 10 }, () => ({ n: 0, p: 0, hit: 0 }));
+  let total = 0;
+  for (const r of Object.values(S.bt.results)) { total += r.n; r.bins.forEach((b, k) => { bins[k].n += b.n; bins[k].p += b.p; bins[k].hit += b.hit; }); }
+  const W = 360, Hh = 250, L = 40, R = 12, T = 12, B = 34;
+  const x = v => L + v * (W - L - R), y = v => T + (1 - v) * (Hh - T - B);
+  let dots = '';
+  const maxN = Math.max(1, ...bins.map(b => b.n));
+  for (const b of bins) {
+    if (b.n < 20) continue;
+    const px = b.p / b.n, py = b.hit / b.n, rad = 3 + 7 * Math.sqrt(b.n / maxN);
+    dots += `<circle cx="${x(px).toFixed(1)}" cy="${y(py).toFixed(1)}" r="${rad.toFixed(1)}" fill="var(--home)" fill-opacity="0.85"><title>${esc(tx('calibDot', { p: pct1(px), q: pct1(py), n: fmtInt(b.n) }))}</title></circle>`;
+  }
+  let grid = '';
+  for (let k = 0; k <= 5; k++) {
+    const v = k / 5;
+    grid += `<line x1="${x(0)}" x2="${x(1)}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)" stroke-width="1"/>`;
+    grid += `<text x="${L - 8}" y="${y(v) + 4}" text-anchor="end" font-size="11" fill="var(--muted)" font-family="IBM Plex Mono, monospace">${esc(NF.pct0.format(v))}</text>`;
+    grid += `<text x="${x(v)}" y="${Hh - B + 18}" text-anchor="middle" font-size="11" fill="var(--muted)" font-family="IBM Plex Mono, monospace">${esc(NF.pct0.format(v))}</text>`;
+  }
+  el.innerHTML = `<div class="eyebrow">${esc(tx('calibTitle', { n: fmtInt(total) }))}</div>
+    <svg viewBox="0 0 ${W} ${Hh}" role="img" aria-label="${esc(tx('calibAria'))}">
+      ${grid}
+      <line x1="${x(0)}" y1="${y(0)}" x2="${x(1)}" y2="${y(1)}" stroke="var(--muted)" stroke-dasharray="4 4" stroke-width="1.2"/>
+      ${dots}
+      <text x="${(L + W - R) / 2}" y="${Hh - 4}" text-anchor="middle" font-size="11" fill="var(--muted)">${esc(tx('calibAxis'))}</text>
+    </svg>
+    <div class="cap">${esc(tx('calibCap'))}</div>`;
+}
+
+/* ==================================================================
+   METHOD
+   ================================================================== */
+function renderMethod() {
+  const d = S.data;
+  const rowsHtml = LEAGUES.map(l => {
+    const ps = d.played.filter(r => r.comp === l.code && r.season === d.cur);
+    const fx = d.fixtures.filter(r => r.comp === l.code);
+    const last = ps.reduce((m, r) => Math.max(m, r.day), 0);
+    return `<tr><td>${esc(leagueName(l.code))}</td><td class="r num">${esc(fmtInt(ps.length))}</td><td class="r num">${esc(fmtInt(fx.length))}</td><td class="r">${last ? esc(fmtDay(last, { day: 'numeric', month: 'short' })) : '—'}</td></tr>`;
+  }).join('');
+  const cups = d.played.filter(r => r.cup).length;
+  const xw = CFG.xgWeight || 0;
+  $('method').innerHTML = `<div>
+      <p>${th('m1', { rho: dec(S.M.rho, 3) })}</p>
+      <p>${th('m2', { hl: fmtInt(CFG.halfLife), n: fmtInt(S.M.n), cups: fmtInt(cups) })}</p>
+      ${xw > 0 && d.xgN ? `<p>${th('m5', { w: pct(xw), g: pct(1 - xw), p1: pct1(0.0074), p2: pct1(0.0027) })}</p>` : ''}
+      <p>${th('m3')}</p>
+      <p>${th('m4')}</p>
+    </div>
+    <div>
+      <div class="eyebrow" style="margin-bottom:6px">${th('freshTitle', { s: seasonLabel(d.cur) })}</div>
+      <div class="table-wrap"><table><thead><tr><th>${esc(tx('thLeague'))}</th><th class="r">${esc(tx('thPlayed'))}</th><th class="r">${esc(tx('thScheduled'))}</th><th class="r">${esc(tx('thLast'))}</th></tr></thead><tbody>${rowsHtml}</tbody></table></div>
+      <p class="note" style="margin-top:10px">${esc(tx('freshNote'))}${d.failed ? ' ' + esc(tx('failedFiles', { n: d.failed })) : ''}</p>
+      ${sourcesPanel()}
+    </div>`;
+}
+
+// "3 hours ago" in the reader's language
+function ago(isoStr) {
+  const t = Date.parse(isoStr);
+  if (!Number.isFinite(t)) return '—';
+  const rtf = new Intl.RelativeTimeFormat(LOCALE[LANG], { numeric: 'auto' });
+  const min = Math.round((t - Date.now()) / 60000);
+  if (Math.abs(min) < 60) return rtf.format(min, 'minute');
+  const h = Math.round(min / 60);
+  if (Math.abs(h) < 48) return rtf.format(h, 'hour');
+  return rtf.format(Math.round(h / 24), 'day');
+}
+
+function sourcesPanel() {
+  const d = S.data, snap = d.snap;
+  const dateOf = s => (s ? fmtDay(parseDay(s), { day: 'numeric', month: 'short' }) : '—');
+  const pill = (s) => {
+    if (!s) return `<span class="pill">${esc(tx('stOff'))}</span>`;
+    if (s.ok === false) return `<span class="pill err">${esc(tx('stErr'))}</span>`;
+    if (s.carriedOver) return `<span class="pill">${esc(tx('stOld'))}</span>`;
+    return `<span class="pill ok">${esc(tx('stOk'))}</span>`;
+  };
+  const src = snap ? snap.sources || {} : {};
+  const fd = src['football-data.org'], us = src.Understat, ol = src.OpenLigaDB, od = src['The Odds API'];
+  const rows = [
+    ['openfootball', { ok: true }, dateOf(S.lastDay ? isoDay(S.lastDay) : null), tx('srcBase', { n: fmtInt(d.ofCount) })],
+    ['football-data.org', fd, fd && dateOf(fd.lastMatch), fd && fd.ok !== false ? tx('srcFd', { n: fmtInt(d.extraN), f: fmtInt((snap.cupFixtures || []).length) }) : (fd && fd.error) || ''],
+    ['Understat', us, us && dateOf(us.lastMatch), us && us.ok !== false ? tx('srcXg', { n: fmtInt(d.xgN) }) : ''],
+    ['OpenLigaDB', ol, ol && dateOf(ol.lastMatch), ol && ol.ok !== false ? tx('srcOl', { n: fmtInt(ol.matches || 0) }) : ''],
+    ['The Odds API', od, od && od.fetchedAt ? ago(od.fetchedAt) : '—', od && od.ok !== false ? tx('srcOdds', { n: fmtInt(d.odds.size), r: od.remaining == null ? '—' : od.remaining, h: od.refreshHours || 24 }) : (od && od.error) || ''],
+  ];
+  const conf = snap ? snap.conflicts || [] : [];
+  const confHtml = !snap ? '' : conf.length
+    ? `<p class="note" style="margin-top:10px">${esc(tx('confSome', { n: conf.length }))}</p><ul class="conflicts">${conf.map(c => `<li dir="auto">${esc(fmtDay(parseDay(c.d), { day: 'numeric', month: 'short', year: 'numeric' }))} · ${esc(shortName(c.h))} – ${esc(shortName(c.a))} · ${Object.entries(c.scores).map(([k, v]) => esc(k) + ' ' + esc(v.replace('-', tx('scoreSep')))).join(' / ')}</li>`).join('')}</ul>`
+    : `<p class="note" style="margin-top:10px">${esc(tx('confNone'))}</p>`;
+  return `<div class="eyebrow" style="margin:18px 0 6px">${esc(tx('srcTitle'))}</div>
+    <p class="note" style="margin-bottom:6px">${esc(snap ? tx('srcAge', { ago: ago(snap.generated) }) : tx('srcNoSnap'))}</p>
+    <div class="table-wrap"><table class="src"><thead><tr><th>${esc(tx('thSource'))}</th><th>${esc(tx('thStatus'))}</th><th>${esc(tx('thFresh'))}</th><th>${esc(tx('thNote'))}</th></tr></thead><tbody>
+      ${rows.map(([name, s, fresh, note]) => `<tr><td>${esc(name)}</td><td>${pill(s)}</td><td>${esc(fresh || '—')}</td><td>${esc(note || '')}</td></tr>`).join('')}
+    </tbody></table></div>${confHtml}`;
+}
+
+/* ==================================================================
+   WIRING
+   ================================================================== */
+$('lang').innerHTML = LANGS.map(l => `<option value="${l.code}" lang="${l.code}">${esc(l.label)}</option>`).join('');
+$('lang').addEventListener('change', e => setLang(e.target.value, true));
+setupCombo('home');
+setupCombo('away');
+$('swap').addEventListener('click', () => { [S.home, S.away] = [S.away, S.home]; renderPicker(); renderResult(); });
+$('neutral').addEventListener('change', e => { S.neutral = e.target.checked; renderResult(); });
+$('reload').addEventListener('click', boot);
+setLang(detectLang(), false);
+boot();
+</script>
+</body>
+</html>
