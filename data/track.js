@@ -1,1 +1,1 @@
-window.MATCHLAB_TRACK={"generated":"2026-10-05T05:30:15Z","model":"v6","cfg":"2496616f","since":"2026-10-02T05:29:18Z","total":78,"settled":0,"locked":0,"open":78,"void":0,"ll":null,"brier":null,"rps":null,"acc":null,"llDc":null,"llElo":null,"market":null,"recent":[]};
+window.MATCHLAB_TRACK={"generated":"2026-10-05T14:29:23Z","model":"v6","cfg":"2496616f","since":"2026-10-02T05:29:18Z","total":78,"settled":0,"locked":0,"open":78,"void":0,"ll":null,"brier":null,"rps":null,"acc":null,"llDc":null,"llElo":null,"market":null,"recent":[]};
