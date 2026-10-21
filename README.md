@@ -9,12 +9,17 @@ Win / draw / loss chances for Europe's football leagues, recomputed from the lat
 - **MatchLab = 65 % Dixon-Coles + 35 % Elo.** The score grid is rescaled to the blended 1X2 so every number on the page agrees.
 - **Uncertainty**: a 90 % range for each probability and ± for each team rating, from the posterior covariance of the Dixon-Coles ratings (Laplace approximation).
 - **One club, one history**: clubs that openfootball spells differently between seasons or divisions are joined into one team.
+- **Season projections**: the rest of each league season is played 10,000 times with MatchLab's own match forecasts (in a Web Worker), starting from the current table with official point deductions. Team strengths take a random walk over the simulated season so far-off matches are less certain; its size was chosen on 2024/25 and tested on 2025/26 ([model-lab/RESULTS.md](model-lab/RESULTS.md)). The page shows expected points with a 90 % range, the chance of the title, the top places and relegation, and the whole final-position distribution.
 
 Every setting and every candidate change was chosen on 2022/23–2023/24 and tested untouched on 2024/25–2026/27 (nested walk-forward). Only the Elo blend passed: −0.0020 (±0.0012) log-loss on the test seasons. Details, and the tests that failed: [model-lab/RESULTS.md](model-lab/RESULTS.md).
 
 ## Live track record
 
 On GitHub, `collector/forecast.mjs` runs `engine.js` — the page's own code — every two hours. Each match of the next seven days gets a forecast that is locked when its match day begins (00:00 UTC) and scored once the result is in. `data/forecasts.json` is committed on every run, so its git history shows that no forecast is changed after the fact; the page shows the summary from `data/track.js`.
+
+## The page
+
+Match prediction (1X2, score grid, both models and the market side by side, each team's form and Elo history), league tables, season projections, upcoming matches, a power ranking, the walk-forward accuracy test, the live track record (overall, per competition and against the market over time) and the method. A match can be shared as a link: `index.html?h=<home>&a=<away>` (`&n=1` for a neutral venue), with the language in the hash (`#id`). Seven languages.
 
 ## Website
 
@@ -41,6 +46,7 @@ Run one updater only: the website's workflow *or* the Windows task (`install-sch
 | `remove-schedule.cmd` | Removes that scheduled task. |
 | `collector/cache/update.log` | Output of the Windows task's last run. |
 | `model-lab/lab.py` | Nested walk-forward validation of the model and its variants (Python, numpy, scipy). Results in `model-lab/RESULTS.md`. |
+| `model-lab/sim_test.mjs` | Walk-forward test of the season projections (Node 18+, uses `engine.js`). |
 | `model-lab/tune.py`, `model-lab/xg_test.py` | The earlier tuning scripts (v1, v3). |
 
 ## Sources

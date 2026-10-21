@@ -65,3 +65,22 @@ On Champions League matches (502 in 2023/24–2025/26; too few to decide anythin
 - **Machine-learning challenger (gradient boosting on shots, rest days, …).** The free sources carry no shots, line-ups or rest data beyond what Dixon-Coles and Elo already use; a model on the same inputs has little to add and much to overfit.
 - **Closing odds / closing-line value.** No free source of historical closing odds is reachable from here (football-data.co.uk fails the TLS handshake). The archive now stores the market's odds next to every forecast, so a model-versus-market record builds up from here on.
 - **Dynamic (state-space) team strengths.** The time decay already lets ratings drift; a state-space model is a larger change that would need its own round of tests.
+
+## Season projections (added after v6)
+
+The page now plays the rest of each league season 10,000 times (`simSetup` / `simRun` in `engine.js`): every remaining match is drawn from MatchLab's own forecast, the 1X2 first and then a score from its grid, so the projection agrees with the match numbers. Ties on points go to goal difference, then goals scored; head-to-head rules are not modelled.
+
+A projection made from fixed ratings is overconfident: over a season teams change, and today's ratings are only estimates. So in each simulated season every team's strength takes a random walk on the log-odds scale of the 1X2, a starting offset (sd *base*) plus drift (sd *drift* per √100 days). This adds no match forecast of its own and is not in `CFG`.
+
+**Test** (`node model-lab/sim_test.mjs`): every four weeks of a season, from week 5 to the end, the model is fitted on the matches before that day only (three seasons, Elo carried from 2018 as the collector does, Understat xG where `data/latest.json` has it), the rest of the season is simulated 2,000 times and the final table scored: the ranked probability score over final positions (main), the log-loss of each team's actual position, and Brier scores for champion, top places and relegation. 20 settings (base 0–0.3 × drift 0–0.4) were tried on 2024/25; the best was then run untouched on 2025/26. 72 league-checkpoints per season. Differences are paired against no uncertainty and averaged per league first (checkpoints of one league are correlated), ±2 standard errors over the eight leagues.
+
+| base | drift | 2024/25 RPS (Δ) | 2025/26 RPS (Δ) | 2024/25 / 2025/26 position log-loss |
+|---|---|---|---|---|
+| 0 | 0 | 0.06437 | 0.07047 | 1.9281 / 1.9659 |
+| 0 | 0.2 | −0.00044 ± 0.00040 | −0.00023 ± 0.00051 | 1.9187 / 1.9657 |
+| 0.1 | 0.2 | −0.00046 ± 0.00049 | −0.00043 ± 0.00072 | 1.9147 / 1.9566 |
+| **0.1** | **0.3** | **−0.00055 ± 0.00072** (best) | **−0.00053 ± 0.00114** | 1.9179 / 1.9602 |
+| 0.2 | 0.2 | −0.00053 ± 0.00068 | −0.00059 ± 0.00110 | 1.9169 / 1.9590 |
+| 0.3 | 0.4 | +0.00015 ± 0.00122 | −0.00010 ± 0.00224 | 1.9409 / 1.9826 |
+
+**Decision: base 0.1, drift 0.3** — the best on 2024/25, and better than no uncertainty on 2025/26 as well, but within noise in both seasons; the surface is flat between 0.1–0.2 base and 0.2–0.3 drift. Two seasons of eight leagues are few independent outcomes, so this mainly guards against overconfident extremes (a "99 %" title that is really 90 %) rather than proving a gain. Too much uncertainty (base 0.3, drift 0.4) is worse than none on position log-loss in both seasons.

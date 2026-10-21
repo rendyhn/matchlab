@@ -373,8 +373,64 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 
 .trk-p span.fav { color: var(--ink); font-weight: 600; }
 .trk-p span.hit { text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 2px; text-decoration-color: var(--win); }
 
+/* ---------- section nav ---------- */
+.secnav {
+  position: sticky; top: 0; z-index: 30; margin-bottom: 18px; padding-block: 8px;
+  background: color-mix(in srgb, var(--ground) 90%, transparent); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--line);
+}
+.secnav ul { display: flex; gap: 4px; overflow-x: auto; list-style: none; margin: 0; padding: 0; scrollbar-width: none; }
+.secnav ul::-webkit-scrollbar { display: none; }
+.secnav a {
+  display: block; white-space: nowrap; padding: 6px 12px; border-radius: 999px; font-size: 13px; font-weight: 500;
+  color: var(--muted); text-decoration: none; border: 1px solid transparent;
+}
+.secnav a:hover { color: var(--ink); background: var(--surface); border-color: var(--line); }
+.secnav a[aria-current="true"] { color: var(--ground); background: var(--ink); }
+main > section { scroll-margin-top: 62px; }
+
+/* ---------- share ---------- */
+.share { display: inline-flex; align-items: center; gap: 6px; }
+.share svg { flex: none; }
+
+/* ---------- Elo history ---------- */
+.elo-hist { margin-top: 14px; }
+.elo-hist .row { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; font-size: 12.5px; color: var(--muted); }
+.elo-hist .row b { font: 500 13px/1 var(--f-mono); color: var(--ink); }
+.elo-hist svg { width: 100%; height: 46px; display: block; margin-top: 4px; direction: ltr; overflow: visible; }
+.chg.up { color: var(--win); }
+.chg.down { color: var(--loss); }
+
+/* ---------- projections ---------- */
+table.proj { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 760px; }
+.proj th { text-align: start; font: 600 11.5px/1.2 var(--f-body); letter-spacing: 0.02em; color: var(--muted); padding: 12px 10px 8px; white-space: nowrap; vertical-align: bottom; }
+.proj td { padding: 7px 10px; border-top: 1px solid var(--line); white-space: nowrap; }
+.proj td.r, .proj th.r { text-align: end; }
+.proj tr.pick { cursor: pointer; }
+.proj tr.pick:hover td { background: var(--surface-2); }
+.proj tr.me td { background: color-mix(in srgb, var(--home) 10%, transparent); }
+.proj .xp { font: 800 17px/1 var(--f-display); font-variant-numeric: tabular-nums; }
+.proj .rg { display: block; font: 400 11px/1.2 var(--f-mono); color: var(--muted); margin-top: 2px; }
+.proj .pc { font: 500 13.5px/1 var(--f-mono); font-variant-numeric: tabular-nums; }
+.proj .pc.zero { color: var(--muted); }
+.proj .pc.hot { font-weight: 600; }
+.posbar { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(12px, 1fr); gap: 2px; min-width: 260px; direction: ltr; }
+.posbar span { height: 20px; border-radius: 3px; background: var(--surface-2); }
+.posbar span.zt { box-shadow: inset 0 -2px 0 var(--win); }
+.posbar span.zr { box-shadow: inset 0 -2px 0 var(--loss); }
+.posaxis { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(12px, 1fr); gap: 2px; font: 400 10px/1 var(--f-mono); color: var(--muted); text-align: center; margin-top: 3px; direction: ltr; }
+.proj-wait { padding: 26px 18px; text-align: center; color: var(--muted); }
+
+/* ---------- track record extras ---------- */
+.trk-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; margin-top: 16px; }
+.trk .chart svg { max-width: 560px; }
+.trk .legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 12.5px; color: var(--muted); margin-top: 6px; }
+.trk .legend i { display: inline-block; width: 18px; height: 0; border-top: 2.5px solid; vertical-align: middle; margin-inline-end: 6px; }
+.better { color: var(--win); }
+.worse { color: var(--loss); }
+
 @media (max-width: 900px) {
-  .result, .acc, .method { grid-template-columns: minmax(0, 1fr); }
+  .result, .acc, .method, .trk-grid { grid-template-columns: minmax(0, 1fr); }
 }
 @media (max-width: 640px) {
   .picker { grid-template-columns: minmax(0, 1fr) auto; }
@@ -388,6 +444,15 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 
   .frow .an { grid-area: an; text-align: end; }
   .frow .mini { grid-area: mini; }
   .outcome .p { font-size: 26px; }
+  table.proj { min-width: 0; font-size: 13px; }
+  .proj .c-pos, .proj .c-now, .proj .c-rank { display: none; }
+  .proj td, .proj th { padding-inline: 5px; }
+  .proj th { font-size: 11px; }
+  /* the team column stays put when a narrow screen scrolls the numbers sideways */
+  .proj .tn { position: sticky; inset-inline-start: 0; z-index: 1; background: var(--surface); max-width: 26vw; overflow: hidden; text-overflow: ellipsis; }
+  .proj tr.me td.tn { background: color-mix(in srgb, var(--home) 10%, var(--surface)); }
+  .proj tr.pick:hover td.tn { background: var(--surface-2); }
+  .proj .xp { font-size: 15px; }
   .brand h1 { font-size: 30px; }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -416,8 +481,10 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 
     </div>
   </header>
 
+  <nav class="secnav" id="secnav" data-i18n-aria="navAria" hidden><ul id="secnav-list"></ul></nav>
+
   <main>
-    <section class="panel predictor" aria-labelledby="pred-title">
+    <section class="panel predictor" id="pred-sec" aria-labelledby="pred-title">
       <h2 id="pred-title" class="sr-only" data-i18n="predTitle"></h2>
       <div class="picker">
         <div class="combo-home-wrap">
@@ -439,6 +506,10 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 
         </div>
         <div class="options">
           <label class="toggle"><input type="checkbox" id="neutral"> <span data-i18n="neutral"></span></label>
+          <button class="icon-btn share" id="share" type="button" data-i18n-title="shareTitle" disabled>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></svg>
+            <span id="share-text" data-i18n="shareBtn"></span>
+          </button>
           <span id="pick-hint"></span>
         </div>
       </div>
@@ -459,6 +530,17 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 
         <div class="chips" id="tbl-filter" role="group" data-i18n-aria="filterAria"></div>
       </div>
       <div class="panel table-wrap" id="tbl"></div>
+    </section>
+
+    <section aria-labelledby="proj-title" id="proj-sec" hidden>
+      <div class="sec-head">
+        <div>
+          <h2 id="proj-title" data-i18n="projTitle"></h2>
+          <p id="proj-sub"></p>
+        </div>
+        <div class="chips" id="proj-filter" role="group" data-i18n-aria="filterAria"></div>
+      </div>
+      <div class="panel table-wrap" id="proj"></div>
     </section>
 
     <section aria-labelledby="fix-title" id="fixtures-sec" hidden>
@@ -660,6 +742,49 @@ en: {
   hElo: 'Elo history: carried from {n} matches since {s}',
   hEloNone: 'Elo history: not in the snapshot yet — Elo starts from scratch on three seasons, a weaker blend.',
   hNames: 'Club names joined across seasons: {n}',
+  navAria: 'Sections',
+  navPred: 'Prediction',
+  navTable: 'Table',
+  navProj: 'Projections',
+  navFix: 'Fixtures',
+  navRank: 'Ranking',
+  navAcc: 'Accuracy',
+  navTrk: 'Track record',
+  navMethod: 'Method',
+  shareBtn: 'Copy link',
+  shareTitle: 'Copy a link that opens this match',
+  shareDone: 'Link copied',
+  shareFail: 'Copy failed',
+  eloSince: 'Elo rating since {date}',
+  eloChg: 'in 30 days',
+  eloAria: 'Elo rating of {team} over time, from {a} to {b}',
+  projTitle: 'Season projections',
+  projSub: 'The rest of the season played {n} times with the model’s own match forecasts, starting from the current table. Team strengths may drift over the season, so distant matches are less certain than next week’s.',
+  projRunning: 'Simulating the rest of the {league} season…',
+  projDone: 'The season is over: no matches left to simulate.',
+  thNow: 'Pts (MP)',
+  thNowTip: 'Points now, with matches played in brackets.',
+  thProj: 'Final pts',
+  thProjTip: 'Average final points; the range below holds 90% of the simulated seasons.',
+  thChamp: 'Champion',
+  thTopK: 'Top {k}',
+  thTopTip: 'Chance of finishing in the top {k}.',
+  thRel: 'Relegated',
+  thRelTip: 'Chance of finishing in the bottom {k}, the direct relegation places (play-off places not included).',
+  thPosDist: 'Final position',
+  posTip: 'Position {pos}: {p}',
+  posAria: '{team}: final position distribution, average {pos}',
+  projFoot: '{p} of {t} matches played, {r} to go.',
+  projTies: 'Teams level on points are separated by goal difference, then goals scored; head-to-head rules are not modelled.',
+  projAdj: 'Official point deductions are included.',
+  trkByComp: 'By competition',
+  thComp: 'Competition',
+  thN: 'Matches',
+  trkByCompNote: 'Log-loss; lower is better. Green where MatchLab beat the market on the same matches, red where the market was better. A few dozen matches per competition are still mostly noise.',
+  trkChart: 'Running log-loss: MatchLab vs market',
+  trkChartAria: 'Running log-loss over time. Latest: MatchLab {m}, market {k}, over {n} matches.',
+  trkChartCap: 'Mean log-loss of every scored forecast up to each day, on the matches with market odds; lower is better. The market has the bookmakers’ margin removed.',
+  m9: '<b>Season projections.</b> The rest of each league season is played {n} times with MatchLab’s own match forecasts. In every simulated season each team’s strength takes a random walk (a starting spread of {b} and a drift of {d} per 100 days, on the log-odds scale), because form, injuries and transfers change teams over months. Tested on 2024/25 and 2025/26, every four weeks to the end of the season, projections with this drift scored slightly better than without it, but the gain was within noise.',
 },
 es: {
   tagline: 'Probabilidades de victoria, empate y derrota en las ligas europeas. El modelo se reentrena con los últimos resultados cada vez que se abre esta página.',
@@ -781,6 +906,49 @@ es: {
   hElo: 'Historial Elo: acumulado con {n} partidos desde {s}',
   hEloNone: 'Historial Elo: aún no está en la instantánea; Elo arranca de cero con tres temporadas y la mezcla es más débil.',
   hNames: 'Nombres de clubes unidos entre temporadas: {n}',
+  navAria: 'Secciones',
+  navPred: 'Predicción',
+  navTable: 'Clasificación',
+  navProj: 'Proyecciones',
+  navFix: 'Partidos',
+  navRank: 'Ranking',
+  navAcc: 'Precisión',
+  navTrk: 'Historial',
+  navMethod: 'Método',
+  shareBtn: 'Copiar enlace',
+  shareTitle: 'Copiar un enlace que abre este partido',
+  shareDone: 'Enlace copiado',
+  shareFail: 'No se pudo copiar',
+  eloSince: 'Valoración Elo desde {date}',
+  eloChg: 'en 30 días',
+  eloAria: 'Valoración Elo de {team} a lo largo del tiempo, de {a} a {b}',
+  projTitle: 'Proyecciones de la temporada',
+  projSub: 'El resto de la temporada jugado {n} veces con los pronósticos del propio modelo, partiendo de la clasificación actual. La fuerza de los equipos puede variar durante la temporada, así que los partidos lejanos son más inciertos que los de la próxima semana.',
+  projRunning: 'Simulando el resto de la temporada de {league}…',
+  projDone: 'La temporada ha terminado: no quedan partidos por simular.',
+  thNow: 'Pts (PJ)',
+  thNowTip: 'Puntos actuales, con los partidos jugados entre paréntesis.',
+  thProj: 'Pts finales',
+  thProjTip: 'Puntos finales medios; el rango de abajo contiene el 90 % de las temporadas simuladas.',
+  thChamp: 'Campeón',
+  thTopK: 'Top {k}',
+  thTopTip: 'Probabilidad de terminar entre los {k} primeros.',
+  thRel: 'Descenso',
+  thRelTip: 'Probabilidad de terminar entre los {k} últimos, las plazas de descenso directo (sin contar la promoción).',
+  thPosDist: 'Posición final',
+  posTip: 'Posición {pos}: {p}',
+  posAria: '{team}: distribución de la posición final, media {pos}',
+  projFoot: '{p} de {t} partidos jugados, quedan {r}.',
+  projTies: 'Los empates a puntos se deciden por diferencia de goles y luego por goles a favor; las reglas de enfrentamiento directo no se modelan.',
+  projAdj: 'Incluye las deducciones de puntos oficiales.',
+  trkByComp: 'Por competición',
+  thComp: 'Competición',
+  thN: 'Partidos',
+  trkByCompNote: 'Log-loss; menos es mejor. En verde donde MatchLab superó al mercado en los mismos partidos, en rojo donde el mercado fue mejor. Unas pocas decenas de partidos por competición todavía son sobre todo ruido.',
+  trkChart: 'Log-loss acumulado: MatchLab frente al mercado',
+  trkChartAria: 'Log-loss acumulado en el tiempo. Último valor: MatchLab {m}, mercado {k}, en {n} partidos.',
+  trkChartCap: 'Log-loss medio de todos los pronósticos puntuados hasta cada día, en los partidos con cuotas de mercado; menos es mejor. Al mercado se le quita el margen de las casas de apuestas.',
+  m9: '<b>Proyecciones de la temporada.</b> El resto de cada liga se juega {n} veces con los pronósticos del propio MatchLab. En cada temporada simulada la fuerza de cada equipo sigue un paseo aleatorio (una dispersión inicial de {b} y una deriva de {d} por cada 100 días, en la escala log-odds), porque la forma, las lesiones y los fichajes cambian a los equipos con los meses. Probadas en 2024/25 y 2025/26, cada cuatro semanas hasta el final de la temporada, las proyecciones con esta deriva puntuaron algo mejor que sin ella, pero la ganancia quedó dentro del ruido.',
 },
 zh: {
   tagline: '欧洲各联赛的胜、平、负概率。每次打开本页面，模型都会用最新赛果重新训练。',
@@ -903,6 +1071,49 @@ zh: {
   hElo: 'Elo 历史：由 {s} 以来 {n} 场比赛累积',
   hEloNone: 'Elo 历史：快照中还没有——Elo 只能用三个赛季从零开始，混合效果较弱。',
   hNames: '跨赛季合并的俱乐部名称：{n}',
+  navAria: '页面导航',
+  navPred: '比赛预测',
+  navTable: '积分榜',
+  navProj: '赛季预测',
+  navFix: '赛程',
+  navRank: '实力排名',
+  navAcc: '准确度',
+  navTrk: '预测记录',
+  navMethod: '方法',
+  shareBtn: '复制链接',
+  shareTitle: '复制可打开这场比赛的链接',
+  shareDone: '链接已复制',
+  shareFail: '复制失败',
+  eloSince: '{date}以来的 Elo 评分',
+  eloChg: '（近 30 天）',
+  eloAria: '{team} 的 Elo 评分走势，从 {a} 到 {b}',
+  projTitle: '赛季走势预测',
+  projSub: '以当前积分榜为起点，用模型自己的单场预测把剩余赛季模拟 {n} 次。球队实力在赛季中可能变化，所以较远的比赛比下周的比赛更不确定。',
+  projRunning: '正在模拟{league}剩余赛季…',
+  projDone: '赛季已结束：没有剩余比赛可模拟。',
+  thNow: '积分（场次）',
+  thNowTip: '当前积分，括号内为已赛场次。',
+  thProj: '最终积分',
+  thProjTip: '平均最终积分；下方范围包含 90% 的模拟赛季。',
+  thChamp: '夺冠',
+  thTopK: '前 {k}',
+  thTopTip: '最终排名前 {k} 的概率。',
+  thRel: '降级',
+  thRelTip: '最终排名倒数 {k} 位（直接降级区，不含附加赛名额）的概率。',
+  thPosDist: '最终名次',
+  posTip: '第 {pos} 名：{p}',
+  posAria: '{team}：最终名次分布，平均第 {pos} 名',
+  projFoot: '已赛 {p} 场，共 {t} 场，剩余 {r} 场。',
+  projTies: '积分相同时先比净胜球，再比进球数；未模拟相互交锋规则。',
+  projAdj: '已计入官方扣分。',
+  trkByComp: '按赛事',
+  thComp: '赛事',
+  thN: '场次',
+  trkByCompNote: 'Log-loss，越低越好。绿色表示在相同比赛上 MatchLab 优于市场，红色表示市场更好。每项赛事只有几十场比赛，差异大多仍是噪声。',
+  trkChart: '累计 log-loss：MatchLab 对比市场',
+  trkChartAria: '累计 log-loss 随时间变化。最新：MatchLab {m}，市场 {k}，共 {n} 场比赛。',
+  trkChartCap: '截至每天所有已评分预测的平均 log-loss（仅含有市场赔率的比赛），越低越好。市场数据已去除博彩公司的抽水。',
+  m9: '<b>赛季预测。</b>每个联赛的剩余赛季用 MatchLab 自己的单场预测模拟 {n} 次。在每个模拟赛季中，各队实力在对数几率尺度上随机游走（初始离散 {b}，每 100 天漂移 {d}），因为状态、伤病和转会会在数月内改变球队。在 2024/25 和 2025/26 赛季上每四周测试一次直到赛季结束，带漂移的预测得分略优于不带漂移，但差距在噪声范围内。',
 },
 fr: {
   tagline: 'Chances de victoire, de nul et de défaite dans les championnats européens. Le modèle se réentraîne sur les derniers résultats à chaque ouverture de la page.',
@@ -1024,6 +1235,49 @@ fr: {
   hElo: 'Historique Elo : cumulé sur {n} matchs depuis {s}',
   hEloNone: 'Historique Elo : pas encore dans l’instantané — Elo repart de zéro sur trois saisons, mélange moins bon.',
   hNames: 'Noms de clubs réunis entre saisons : {n}',
+  navAria: 'Sections',
+  navPred: 'Prédiction',
+  navTable: 'Classement',
+  navProj: 'Projections',
+  navFix: 'Matchs',
+  navRank: 'Force',
+  navAcc: 'Précision',
+  navTrk: 'Historique',
+  navMethod: 'Méthode',
+  shareBtn: 'Copier le lien',
+  shareTitle: 'Copier un lien qui ouvre ce match',
+  shareDone: 'Lien copié',
+  shareFail: 'Échec de la copie',
+  eloSince: 'Note Elo depuis {date}',
+  eloChg: 'en 30 jours',
+  eloAria: 'Note Elo de {team} au fil du temps, de {a} à {b}',
+  projTitle: 'Projections de la saison',
+  projSub: 'La fin de saison jouée {n} fois avec les prévisions du modèle lui-même, à partir du classement actuel. La force des équipes peut évoluer au fil de la saison : les matchs lointains sont donc plus incertains que ceux de la semaine prochaine.',
+  projRunning: 'Simulation de la fin de saison de {league}…',
+  projDone: 'La saison est terminée : plus aucun match à simuler.',
+  thNow: 'Pts (J)',
+  thNowTip: 'Points actuels, matchs joués entre parenthèses.',
+  thProj: 'Pts finaux',
+  thProjTip: 'Points finaux moyens ; la fourchette dessous contient 90 % des saisons simulées.',
+  thChamp: 'Champion',
+  thTopK: 'Top {k}',
+  thTopTip: 'Probabilité de finir dans les {k} premiers.',
+  thRel: 'Relégué',
+  thRelTip: 'Probabilité de finir dans les {k} derniers, les places de relégation directe (barrages non compris).',
+  thPosDist: 'Position finale',
+  posTip: 'Position {pos} : {p}',
+  posAria: '{team} : répartition de la position finale, moyenne {pos}',
+  projFoot: '{p} matchs joués sur {t}, {r} restants.',
+  projTies: 'À égalité de points, la différence de buts puis les buts marqués départagent les équipes ; les règles de confrontation directe ne sont pas modélisées.',
+  projAdj: 'Les retraits de points officiels sont inclus.',
+  trkByComp: 'Par compétition',
+  thComp: 'Compétition',
+  thN: 'Matchs',
+  trkByCompNote: 'Log-loss ; plus bas est meilleur. En vert quand MatchLab a battu le marché sur les mêmes matchs, en rouge quand le marché a fait mieux. Quelques dizaines de matchs par compétition, c’est encore surtout du bruit.',
+  trkChart: 'Log-loss cumulé : MatchLab contre le marché',
+  trkChartAria: 'Log-loss cumulé au fil du temps. Dernière valeur : MatchLab {m}, marché {k}, sur {n} matchs.',
+  trkChartCap: 'Log-loss moyen de toutes les prévisions notées jusqu’à chaque jour, sur les matchs avec cotes du marché ; plus bas est meilleur. La marge des bookmakers est retirée du marché.',
+  m9: '<b>Projections de la saison.</b> La fin de chaque championnat est jouée {n} fois avec les prévisions de MatchLab lui-même. Dans chaque saison simulée, la force de chaque équipe suit une marche aléatoire (un écart initial de {b} et une dérive de {d} par 100 jours, sur l’échelle des log-odds), car la forme, les blessures et les transferts changent les équipes au fil des mois. Testées sur 2024/25 et 2025/26, toutes les quatre semaines jusqu’à la fin de la saison, les projections avec cette dérive ont obtenu un score un peu meilleur que sans, mais l’écart reste dans le bruit.',
 },
 de: {
   tagline: 'Sieg-, Remis- und Niederlagenchancen für Europas Ligen. Das Modell lernt bei jedem Öffnen der Seite neu aus den aktuellsten Ergebnissen.',
@@ -1145,6 +1399,49 @@ de: {
   hElo: 'Elo-Historie: fortgeschrieben aus {n} Spielen seit {s}',
   hEloNone: 'Elo-Historie: noch nicht im Snapshot – Elo beginnt mit drei Saisons bei null, die Mischung ist schwächer.',
   hNames: 'Über Saisons zusammengeführte Klubnamen: {n}',
+  navAria: 'Abschnitte',
+  navPred: 'Prognose',
+  navTable: 'Tabelle',
+  navProj: 'Hochrechnung',
+  navFix: 'Spiele',
+  navRank: 'Ranking',
+  navAcc: 'Genauigkeit',
+  navTrk: 'Bilanz',
+  navMethod: 'Methode',
+  shareBtn: 'Link kopieren',
+  shareTitle: 'Einen Link kopieren, der dieses Spiel öffnet',
+  shareDone: 'Link kopiert',
+  shareFail: 'Kopieren fehlgeschlagen',
+  eloSince: 'Elo-Wertung seit {date}',
+  eloChg: 'in 30 Tagen',
+  eloAria: 'Elo-Wertung von {team} im Zeitverlauf, von {a} bis {b}',
+  projTitle: 'Saison-Hochrechnung',
+  projSub: 'Der Rest der Saison {n}-mal mit den eigenen Spielprognosen des Modells durchgespielt, ausgehend von der aktuellen Tabelle. Die Stärke der Teams darf sich im Lauf der Saison verändern, deshalb sind ferne Spiele unsicherer als die der nächsten Woche.',
+  projRunning: 'Der Rest der Saison in {league} wird simuliert…',
+  projDone: 'Die Saison ist vorbei: keine Spiele mehr zu simulieren.',
+  thNow: 'Pkt. (Sp.)',
+  thNowTip: 'Punkte jetzt, gespielte Spiele in Klammern.',
+  thProj: 'Endpunkte',
+  thProjTip: 'Durchschnittliche Endpunktzahl; die Spanne darunter enthält 90 % der simulierten Saisons.',
+  thChamp: 'Meister',
+  thTopK: 'Top {k}',
+  thTopTip: 'Wahrscheinlichkeit, unter den ersten {k} zu landen.',
+  thRel: 'Abstieg',
+  thRelTip: 'Wahrscheinlichkeit, auf den letzten {k} Plätzen zu landen, den direkten Abstiegsplätzen (Relegationsplätze nicht mitgezählt).',
+  thPosDist: 'Endplatzierung',
+  posTip: 'Platz {pos}: {p}',
+  posAria: '{team}: Verteilung der Endplatzierung, im Mittel {pos}',
+  projFoot: '{p} von {t} Spielen gespielt, {r} stehen aus.',
+  projTies: 'Bei Punktgleichheit entscheiden die Tordifferenz, dann die erzielten Tore; Regeln zum direkten Vergleich sind nicht modelliert.',
+  projAdj: 'Offizielle Punktabzüge sind berücksichtigt.',
+  trkByComp: 'Nach Wettbewerb',
+  thComp: 'Wettbewerb',
+  thN: 'Spiele',
+  trkByCompNote: 'Log-Loss; niedriger ist besser. Grün, wo MatchLab den Markt bei denselben Spielen geschlagen hat, rot, wo der Markt besser war. Ein paar Dutzend Spiele pro Wettbewerb sind noch überwiegend Rauschen.',
+  trkChart: 'Laufender Log-Loss: MatchLab gegen den Markt',
+  trkChartAria: 'Laufender Log-Loss über die Zeit. Zuletzt: MatchLab {m}, Markt {k}, über {n} Spiele.',
+  trkChartCap: 'Mittlerer Log-Loss aller bewerteten Prognosen bis zum jeweiligen Tag, bei den Spielen mit Marktquoten; niedriger ist besser. Beim Markt ist die Buchmachermarge herausgerechnet.',
+  m9: '<b>Saison-Hochrechnung.</b> Der Rest jeder Ligasaison wird {n}-mal mit MatchLabs eigenen Spielprognosen durchgespielt. In jeder simulierten Saison folgt die Stärke jedes Teams einem Zufallspfad (Anfangsstreuung {b}, Drift {d} pro 100 Tage, auf der Log-Odds-Skala), weil Form, Verletzungen und Transfers Teams über Monate verändern. Getestet auf 2024/25 und 2025/26, alle vier Wochen bis Saisonende, schnitten Hochrechnungen mit dieser Drift etwas besser ab als ohne, der Gewinn lag aber im Rauschen.',
 },
 ar: {
   tagline: 'احتمالات الفوز والتعادل والخسارة في الدوريات الأوروبية. يُعاد تدريب النموذج على أحدث النتائج في كل مرة تُفتح فيها هذه الصفحة.',
@@ -1267,6 +1564,49 @@ ar: {
   hElo: 'تاريخ إيلو: متراكم من {n} مباراة منذ {s}',
   hEloNone: 'تاريخ إيلو: غير موجود في اللقطة بعد؛ يبدأ إيلو من الصفر على ثلاثة مواسم ويكون المزيج أضعف.',
   hNames: 'أسماء أندية دُمجت عبر المواسم: {n}',
+  navAria: 'الأقسام',
+  navPred: 'التوقّع',
+  navTable: 'الترتيب',
+  navProj: 'توقّعات الموسم',
+  navFix: 'المباريات',
+  navRank: 'ترتيب القوة',
+  navAcc: 'الدقة',
+  navTrk: 'السجل',
+  navMethod: 'المنهجية',
+  shareBtn: 'نسخ الرابط',
+  shareTitle: 'نسخ رابط يفتح هذه المباراة',
+  shareDone: 'تم نسخ الرابط',
+  shareFail: 'تعذّر النسخ',
+  eloSince: 'تقييم إيلو منذ {date}',
+  eloChg: 'خلال 30 يومًا',
+  eloAria: 'تقييم إيلو لفريق {team} عبر الزمن، من {a} إلى {b}',
+  projTitle: 'توقّعات الموسم',
+  projSub: 'بقية الموسم تُلعب {n} مرة بتوقّعات النموذج نفسه للمباريات، انطلاقًا من الترتيب الحالي. قد تتغيّر قوة الفرق خلال الموسم، لذا فالمباريات البعيدة أقل يقينًا من مباريات الأسبوع القادم.',
+  projRunning: 'جارٍ محاكاة بقية موسم {league}…',
+  projDone: 'انتهى الموسم: لم تبقَ مباريات للمحاكاة.',
+  thNow: 'النقاط (لعب)',
+  thNowTip: 'النقاط الحالية، وبين القوسين عدد المباريات الملعوبة.',
+  thProj: 'النقاط النهائية',
+  thProjTip: 'متوسط النقاط النهائية؛ النطاق أدناه يضم 90% من المواسم المحاكاة.',
+  thChamp: 'البطل',
+  thTopK: 'أول {k}',
+  thTopTip: 'احتمال الإنهاء ضمن أول {k}.',
+  thRel: 'الهبوط',
+  thRelTip: 'احتمال الإنهاء في آخر {k} مراكز، وهي مراكز الهبوط المباشر (دون مراكز الملحق).',
+  thPosDist: 'المركز النهائي',
+  posTip: 'المركز {pos}: {p}',
+  posAria: '{team}: توزيع المركز النهائي، بمتوسط {pos}',
+  projFoot: 'لُعبت {p} من أصل {t} مباراة، وتبقى {r}.',
+  projTies: 'عند التساوي في النقاط يُحسم الترتيب بفارق الأهداف ثم الأهداف المسجّلة؛ قواعد المواجهات المباشرة غير مُضمّنة في النموذج.',
+  projAdj: 'تشمل خصومات النقاط الرسمية.',
+  trkByComp: 'حسب البطولة',
+  thComp: 'البطولة',
+  thN: 'المباريات',
+  trkByCompNote: 'الخسارة اللوغاريتمية؛ الأقل أفضل. بالأخضر حيث تفوّق MatchLab على السوق في المباريات نفسها، وبالأحمر حيث كان السوق أفضل. بضع عشرات من المباريات لكل بطولة ما زالت في معظمها ضجيجًا.',
+  trkChart: 'الخسارة اللوغاريتمية التراكمية: MatchLab مقابل السوق',
+  trkChartAria: 'الخسارة اللوغاريتمية التراكمية عبر الزمن. الأحدث: MatchLab {m}، السوق {k}، على {n} مباراة.',
+  trkChartCap: 'متوسط الخسارة اللوغاريتمية لكل التوقّعات المقيَّمة حتى كل يوم، على المباريات التي لها احتمالات سوق؛ الأقل أفضل. أُزيل هامش شركات المراهنات من السوق.',
+  m9: '<b>توقّعات الموسم.</b> تُلعب بقية كل دوري {n} مرة بتوقّعات MatchLab نفسه للمباريات. في كل موسم محاكى تسير قوة كل فريق مسارًا عشوائيًا (تشتت ابتدائي {b} وانجراف {d} لكل 100 يوم، على مقياس لوغاريتم الأرجحية)، لأن المستوى والإصابات والانتقالات تغيّر الفرق عبر الأشهر. عند اختبارها على موسمي 2024/25 و2025/26، كل أربعة أسابيع حتى نهاية الموسم، حققت التوقّعات مع هذا الانجراف نتيجة أفضل قليلًا من دونه، لكن الفارق بقي ضمن الضجيج.',
 },
 id: {
   tagline: 'Peluang menang, seri, dan kalah untuk liga-liga Eropa. Model dilatih ulang dari hasil pertandingan terbaru setiap kali halaman ini dibuka.',
@@ -1388,6 +1728,49 @@ id: {
   hElo: 'Riwayat Elo: terakumulasi dari {n} laga sejak {s}',
   hEloNone: 'Riwayat Elo: belum ada di snapshot — Elo mulai dari nol dengan tiga musim, campurannya lebih lemah.',
   hNames: 'Nama klub yang digabung antar-musim: {n}',
+  navAria: 'Bagian',
+  navPred: 'Prediksi',
+  navTable: 'Klasemen',
+  navProj: 'Proyeksi',
+  navFix: 'Jadwal',
+  navRank: 'Peringkat',
+  navAcc: 'Akurasi',
+  navTrk: 'Rekam jejak',
+  navMethod: 'Metode',
+  shareBtn: 'Salin tautan',
+  shareTitle: 'Salin tautan yang membuka laga ini',
+  shareDone: 'Tautan disalin',
+  shareFail: 'Gagal menyalin',
+  eloSince: 'Rating Elo sejak {date}',
+  eloChg: 'dalam 30 hari',
+  eloAria: 'Rating Elo {team} dari waktu ke waktu, dari {a} ke {b}',
+  projTitle: 'Proyeksi musim',
+  projSub: 'Sisa musim dimainkan {n} kali dengan prediksi laga dari model itu sendiri, dimulai dari klasemen saat ini. Kekuatan tim boleh berubah sepanjang musim, jadi laga yang masih jauh lebih tidak pasti daripada laga pekan depan.',
+  projRunning: 'Menyimulasikan sisa musim {league}…',
+  projDone: 'Musim sudah selesai: tidak ada laga tersisa untuk disimulasikan.',
+  thNow: 'Poin (main)',
+  thNowTip: 'Poin saat ini, jumlah laga yang sudah dimainkan dalam kurung.',
+  thProj: 'Poin akhir',
+  thProjTip: 'Rata-rata poin akhir; rentang di bawahnya memuat 90% musim simulasi.',
+  thChamp: 'Juara',
+  thTopK: '{k} besar',
+  thTopTip: 'Peluang finis di {k} besar.',
+  thRel: 'Degradasi',
+  thRelTip: 'Peluang finis di {k} terbawah, zona degradasi langsung (tidak termasuk tempat play-off).',
+  thPosDist: 'Posisi akhir',
+  posTip: 'Posisi {pos}: {p}',
+  posAria: '{team}: sebaran posisi akhir, rata-rata {pos}',
+  projFoot: '{p} dari {t} laga sudah dimainkan, tersisa {r}.',
+  projTies: 'Tim dengan poin sama dipisahkan oleh selisih gol, lalu jumlah gol; aturan head-to-head tidak dimodelkan.',
+  projAdj: 'Pengurangan poin resmi sudah diperhitungkan.',
+  trkByComp: 'Per kompetisi',
+  thComp: 'Kompetisi',
+  thN: 'Laga',
+  trkByCompNote: 'Log-loss; makin rendah makin baik. Hijau jika MatchLab mengalahkan pasar pada laga yang sama, merah jika pasar lebih baik. Beberapa puluh laga per kompetisi sebagian besar masih noise.',
+  trkChart: 'Log-loss berjalan: MatchLab vs pasar',
+  trkChartAria: 'Log-loss berjalan dari waktu ke waktu. Terakhir: MatchLab {m}, pasar {k}, dari {n} laga.',
+  trkChartCap: 'Rata-rata log-loss semua prediksi yang sudah dinilai hingga tiap hari, pada laga yang punya odds pasar; makin rendah makin baik. Margin bandar sudah dihapus dari pasar.',
+  m9: '<b>Proyeksi musim.</b> Sisa musim tiap liga dimainkan {n} kali dengan prediksi laga dari MatchLab sendiri. Di setiap musim simulasi, kekuatan tiap tim berjalan acak (sebaran awal {b} dan drift {d} per 100 hari, pada skala log-odds), karena performa, cedera, dan transfer mengubah tim dari bulan ke bulan. Diuji pada 2024/25 dan 2025/26, setiap empat pekan hingga akhir musim, proyeksi dengan drift ini mendapat skor sedikit lebih baik daripada tanpa drift, tetapi selisihnya masih dalam batas noise.',
 },
 };
 
@@ -1460,7 +1843,8 @@ function setLang(code, save) {
   applyStatic();
   renderStatus();
   if (S.M) {
-    renderPicker(); renderResult(); renderStandings(); renderFixtures(); renderRanking(); renderMethod(); renderAccuracy();
+    renderPicker(); renderResult(); renderStandings(); renderProjections(); renderFixtures(); renderRanking(); renderMethod(); renderAccuracy(); renderTrack();
+    renderNav();
   } else {
     renderLoading();
     if (!$('pick-hint').dataset.set) $('pick-hint').textContent = tx('hintStart');
@@ -1547,6 +1931,7 @@ const S = {
   home: null, away: null, neutral: false, fixFilter: 'all', rankFilter: 'all',
   status: { kind: '', key: 'stLoading', vars: null }, loading: { key: 'ldFetch', vars: null },
   bt: null, worker: null, btToken: 0,
+  proj: null, projToken: 0, projLeague: null, urlActive: false,
 };
 const $ = id => document.getElementById(id);
 
@@ -1562,6 +1947,9 @@ function renderLoading() { $('loading-text').textContent = tx(S.loading.key, S.l
 async function boot() {
   $('reload').disabled = true;
   S.M = null; S.st = null; S.lap = null;
+  S.projToken++;
+  if (S.proj && S.proj.worker) S.proj.worker.terminate();
+  S.proj = { cache: new Map(), pending: new Set(), jobs: new Map(), worker: null, noWorker: !!(S.proj && S.proj.noWorker) };
   setStatus('', 'stLoading');
   $('loading').hidden = false;
   $('result').querySelectorAll(':scope > :not(#loading)').forEach(e => e.remove());
@@ -1617,11 +2005,16 @@ async function boot() {
   const srcOk = 1 + (data.snap ? Object.entries(data.snap.sources || {}).filter(([k, s]) => k !== 'openfootball' && s && s.ok !== false).length : 0);
   setStatus('live', 'stLive3', () => ({ date: fmtDay(S.lastDay, { day: 'numeric', month: 'short', year: 'numeric' }), n: fmtInt(data.played.length), src: srcOk, ms: fmtInt(S.fitMs) }));
 
-  if (!S.home || !S.TI.idx.has(S.home) || !S.away || !S.TI.idx.has(S.away)) pickDefault();
+  // a match link (?h=…&a=…) is read once, on the first load
+  const fromUrl = !S.urlRead && readUrlMatch();
+  S.urlRead = true;
+  if (!fromUrl && (!S.home || !S.TI.idx.has(S.home) || !S.away || !S.TI.idx.has(S.away))) pickDefault();
   $('loading').hidden = true;
-  ['in-home', 'in-away', 'swap'].forEach(id => { $(id).disabled = false; });
+  ['in-home', 'in-away', 'swap', 'share'].forEach(id => { $(id).disabled = false; });
   renderPicker(); renderResult(); renderStandings(); renderFixtures(); renderRanking(); renderTrack(); renderMethod();
   ['tbl-sec', 'fixtures-sec', 'rank-sec', 'acc-sec', 'method-sec'].forEach(id => { $(id).hidden = false; });
+  renderProjections();
+  renderNav();
   $('reload').disabled = false;
   runBacktest();
   // the covariance of the ratings (a few hundred ms) comes after the first paint; the ranges appear then
@@ -1706,7 +2099,7 @@ function setupCombo(side) {
   let opts = [], active = -1;
   const close = () => { list.hidden = true; input.setAttribute('aria-expanded', 'false'); active = -1; };
   const choose = name => {
-    S[side] = name; close(); input.value = shortName(name); input.title = name; renderResult();
+    S[side] = name; close(); input.value = shortName(name); input.title = name; userPicked(); renderResult();
   };
   const render = () => {
     if (!S.M) return;
@@ -1845,6 +2238,7 @@ function renderResult() {
       </div>
       <div class="form" aria-label="${esc(tx('formAria'))}">${chips || `<span class="empty">${esc(tx('noMatches'))}</span>`}</div>
       ${lastM ? `<div class="lastline">${th('last', { vs: tx(lastM.isH ? 'vsHome' : 'vsAway'), opp: shortName(lastM.opp), score: score(lastM.gf, lastM.ga), date: fmtDay(lastM.r.day, { day: 'numeric', month: 'short' }), comp: compLabel(lastM.r) })}</div>` : ''}
+      ${eloSpark(name, col)}
     </article>`;
   };
 
@@ -1921,6 +2315,7 @@ function renderResult() {
   box.appendChild(div);
   $('pick-hint').dataset.set = '1';
   $('pick-hint').textContent = tx('hintOdds', { n: fmtInt(S.M.n) });
+  syncUrl();
 }
 
 /* ==================================================================
@@ -1963,8 +2358,8 @@ function renderFixtures() {
   $('fixtures').onclick = e => {
     const b = e.target.closest('.frow'); if (!b) return;
     S.home = b.dataset.h; S.away = b.dataset.a; S.neutral = false;
-    renderPicker(); renderResult();
-    document.querySelector('.predictor').scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
+    userPicked(); renderPicker(); renderResult();
+    toPredictor();
   };
 }
 
@@ -2012,8 +2407,8 @@ function renderStandings() {
   const use = tr => {
     const name = tr.dataset.name;
     if (!S.home || S.home === name) S.away = name; else if (S.away !== name) { S.away = S.home; S.home = name; }
-    renderPicker(); renderResult(); renderStandings();
-    document.querySelector('.predictor').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    userPicked(); renderPicker(); renderResult(); renderStandings();
+    toPredictor();
   };
   $('tbl').onclick = e => { const tr = e.target.closest('tr.pick'); if (tr) use(tr); };
   $('tbl').onkeydown = e => { if (e.key === 'Enter') { const tr = e.target.closest('tr.pick'); if (tr) use(tr); } };
@@ -2047,8 +2442,8 @@ function renderRanking() {
   const use = tr => {
     const name = tr.dataset.name;
     if (!S.home || S.home === name) S.away = name; else if (S.away !== name) { S.away = S.home; S.home = name; }
-    renderPicker(); renderResult();
-    document.querySelector('.predictor').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    userPicked(); renderPicker(); renderResult();
+    toPredictor();
   };
   $('rank-table').onclick = e => { const tr = e.target.closest('tr.pick'); if (tr) use(tr); };
   $('rank-table').onkeydown = e => { if (e.key === 'Enter') { const tr = e.target.closest('tr.pick'); if (tr) use(tr); } };
@@ -2179,10 +2574,60 @@ function renderTrack() {
       return `<tr><td class="dt">${esc(fmtDay(parseDay(e.d), { day: 'numeric', month: 'short' }))}</td><td dir="auto">${esc(shortName(e.h))} – ${esc(shortName(e.a))} <span class="lgtag">${esc(lgShort(e.comp))}</span></td>
         <td class="r num trk-p">${cell(0)} · ${cell(1)} · ${cell(2)}</td><td class="c num">${esc(score(e.res[0], e.res[1]))}</td><td class="r num">${esc(dec(e.ll, 2))}</td></tr>`;
     }).join('');
+    html += trackExtras(T);
     html += `<div class="eyebrow" style="margin:16px 0 6px">${esc(tx('trkRecent'))}</div>
       <div class="table-wrap"><table class="tbl"><thead><tr><th>${esc(tx('thDate'))}</th><th>${esc(tx('thMatch'))}</th><th class="r">${esc(tx('thFcst').replace('X', X))}</th><th class="c">${esc(tx('thResult'))}</th><th class="r">${esc(tx('thLL'))}</th></tr></thead><tbody>${rows}</tbody></table></div>`;
   }
   $('trk').innerHTML = html;
+}
+
+// Per competition, and the running log-loss of MatchLab and of the market on the same matches
+// (written into data/track.js by collector/forecast.mjs; an older track.js has neither).
+function trackExtras(T) {
+  let comp = '', chart = '';
+  if (Array.isArray(T.byComp) && T.byComp.length) {
+    const rows = T.byComp.map(c => {
+      const cmp = c.mll == null ? '' : c.llm < c.mll ? 'better' : c.llm > c.mll ? 'worse' : '';
+      return `<tr><td>${esc(leagueName(c.comp))}</td><td class="r num">${esc(fmtInt(c.n))}</td>
+        <td class="r num ${cmp}">${esc(dec(c.ll, 3))}</td><td class="r num">${c.mll == null ? '—' : esc(dec(c.mll, 3))}</td><td class="r num">${esc(pct(c.acc))}</td></tr>`;
+    }).join('');
+    comp = `<div><div class="eyebrow" style="margin-bottom:6px">${esc(tx('trkByComp'))}</div>
+      <div class="table-wrap"><table class="tbl" style="min-width:0"><thead><tr><th>${esc(tx('thComp'))}</th><th class="r">${esc(tx('thN'))}</th>
+        <th class="r">MatchLab</th><th class="r">${esc(tx('consMkt'))}</th><th class="r">${esc(tx('trkAcc'))}</th></tr></thead><tbody>${rows}</tbody></table></div>
+      <p class="note" style="margin-top:6px;font-size:12.5px">${esc(tx('trkByCompNote'))}</p></div>`;
+  }
+  if (Array.isArray(T.series) && T.series.length) {
+    // running means on the matches that have market odds, from the 20th such match on
+    const pts = []; let n = 0, a = 0, b = 0;
+    for (const [d, , , nm, llm, mll] of T.series) { n += nm; a += llm; b += mll; if (n >= 20) pts.push([parseDay(d), a / n, b / n, n]); }
+    if (pts.length >= 2) {
+      const W = 360, Hh = 210, L = 44, R = 10, Tp = 10, B = 30;
+      const d0 = pts[0][0], d1 = pts[pts.length - 1][0];
+      let lo = Infinity, hi = -Infinity;
+      for (const p of pts) { lo = Math.min(lo, p[1], p[2]); hi = Math.max(hi, p[1], p[2]); }
+      const padv = Math.max(0.01, (hi - lo) * 0.15); lo -= padv; hi += padv;
+      const x = d => L + (W - L - R) * (d - d0) / Math.max(1, d1 - d0), y = v => Tp + (Hh - Tp - B) * (1 - (v - lo) / (hi - lo));
+      const path = k => pts.map((p, i) => `${i ? 'L' : 'M'}${x(p[0]).toFixed(1)} ${y(p[k]).toFixed(1)}`).join(' ');
+      let grid = '';
+      for (let i = 0; i <= 4; i++) {
+        const v = lo + (hi - lo) * i / 4;
+        grid += `<line x1="${L}" x2="${W - R}" y1="${y(v).toFixed(1)}" y2="${y(v).toFixed(1)}" stroke="var(--line)"/>`
+          + `<text x="${L - 6}" y="${(y(v) + 4).toFixed(1)}" text-anchor="end" font-size="11" fill="var(--muted)" font-family="IBM Plex Mono, monospace">${esc(dec(v, 3))}</text>`;
+      }
+      const lab = d => esc(fmtDay(d, { day: 'numeric', month: 'short' }));
+      grid += `<text x="${L}" y="${Hh - 8}" font-size="11" fill="var(--muted)">${lab(d0)}</text><text x="${W - R}" y="${Hh - 8}" text-anchor="end" font-size="11" fill="var(--muted)">${lab(d1)}</text>`;
+      const last = pts[pts.length - 1];
+      chart = `<div class="chart"><div class="eyebrow">${esc(tx('trkChart'))}</div>
+        <svg viewBox="0 0 ${W} ${Hh}" role="img" aria-label="${esc(tx('trkChartAria', { m: dec(last[1], 3), k: dec(last[2], 3), n: fmtInt(last[3]) }))}">
+          ${grid}
+          <path d="${path(2)}" fill="none" stroke="var(--muted)" stroke-width="2" stroke-dasharray="5 4"/>
+          <path d="${path(1)}" fill="none" stroke="var(--home)" stroke-width="2.4"/>
+        </svg>
+        <div class="legend"><span><i style="border-color:var(--home)"></i>MatchLab ${esc(dec(last[1], 3))}</span><span><i style="border-color:var(--muted);border-top-style:dashed"></i>${esc(tx('consMkt'))} ${esc(dec(last[2], 3))}</span></div>
+        <div class="cap">${esc(tx('trkChartCap'))}</div></div>`;
+    }
+  }
+  return comp || chart ? `<div class="trk-grid">${comp}${chart}</div>` : '';
 }
 
 function renderCalibration() {
@@ -2236,6 +2681,7 @@ function renderMethod() {
       ${xw > 0 && d.xgN ? `<p>${th('m5', { w: pct(xw), g: pct(1 - xw), p1: pct1(0.0074), p2: pct1(0.0027) })}</p>` : ''}
       <p>${th('m6', { elo: pct(CFG.eloWeight), dc: pct(1 - CFG.eloWeight) })}</p>
       <p>${th('m7')}</p>
+      <p>${th('m9', { n: fmtInt(SIM.n), b: dec(SIM.base, 2), d: dec(SIM.drift, 2) })}</p>
       <p>${th('m3')}</p>
       <p>${th('m8', { n: fmtInt(d.merged) })}</p>
       <p>${th('m4')}</p>
@@ -2309,14 +2755,231 @@ function healthPanel() {
 }
 
 /* ==================================================================
+   SECTION NAV (sticky; the hash stays the language, so links scroll instead of navigating)
+   ================================================================== */
+const NAV = [['pred-sec', 'navPred'], ['tbl-sec', 'navTable'], ['proj-sec', 'navProj'], ['fixtures-sec', 'navFix'],
+  ['rank-sec', 'navRank'], ['acc-sec', 'navAcc'], ['trk-sec', 'navTrk'], ['method-sec', 'navMethod']];
+const smooth = () => (matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth');
+const toPredictor = () => $('pred-sec').scrollIntoView({ behavior: smooth(), block: 'start' });
+let navObserver = null;
+function renderNav() {
+  const items = NAV.filter(([id]) => !$(id).hidden);
+  $('secnav').hidden = !items.length;
+  const ul = $('secnav-list');
+  ul.innerHTML = items.map(([id, key]) => `<li><a href="#${id}" data-sec="${id}" aria-current="false">${esc(tx(key))}</a></li>`).join('');
+  ul.onclick = e => {
+    const a = e.target.closest('a[data-sec]'); if (!a) return;
+    e.preventDefault();
+    $(a.dataset.sec).scrollIntoView({ behavior: smooth(), block: 'start' });
+  };
+  if (navObserver) navObserver.disconnect();
+  if (!('IntersectionObserver' in window)) return;
+  const seen = new Set();
+  navObserver = new IntersectionObserver(entries => {
+    for (const en of entries) { if (en.isIntersecting) seen.add(en.target.id); else seen.delete(en.target.id); }
+    const cur = items.find(([id]) => seen.has(id));
+    ul.querySelectorAll('a').forEach(a => {
+      const on = !!cur && a.dataset.sec === cur[0];
+      a.setAttribute('aria-current', on ? 'true' : 'false');
+      // keep the current item in view when the bar scrolls sideways (phones)
+      if (on && ul.scrollWidth > ul.clientWidth) {
+        const l = a.offsetLeft - ul.offsetLeft, r = l + a.offsetWidth;
+        if (l < ul.scrollLeft || r > ul.scrollLeft + ul.clientWidth) ul.scrollLeft = Math.max(0, l - 16);
+      }
+    });
+  }, { rootMargin: '-70px 0px -55% 0px' });
+  for (const [id] of items) navObserver.observe($(id));
+}
+
+/* ==================================================================
+   SHAREABLE MATCH LINK: ?h=<home>&a=<away>[&n=1]; the language stays in the hash
+   ================================================================== */
+const pageBase = () => location.href.split(/[?#]/)[0];
+function matchQuery() {
+  const p = new URLSearchParams();
+  p.set('h', S.home); p.set('a', S.away);
+  if (S.neutral) p.set('n', '1');
+  return '?' + p.toString();
+}
+// the address bar follows the match once the reader has picked one (or opened a match link)
+function syncUrl() {
+  if (!S.urlActive || !S.home || !S.away || S.home === S.away) return;
+  try { history.replaceState(null, '', matchQuery() + '#' + LANG); } catch (e) { /* file:// may refuse */ }
+}
+const userPicked = () => { S.urlActive = true; };
+// a team named in a link: the exact name, or the full or short name ignoring case and accents
+function teamFromUrl(v) {
+  if (!v) return null;
+  if (S.selectable.some(t => t.name === v)) return v;
+  const f = fold(v);
+  const t = S.selectable.find(x => fold(x.name) === f || fold(x.short) === f);
+  return t ? t.name : null;
+}
+function readUrlMatch() {
+  let q;
+  try { q = new URLSearchParams(location.search); } catch (e) { return false; }
+  const h = teamFromUrl(q.get('h')), a = teamFromUrl(q.get('a'));
+  if (!h || !a || h === a) return false;
+  S.home = h; S.away = a; S.neutral = q.get('n') === '1'; S.urlActive = true;
+  return true;
+}
+async function copyShare() {
+  userPicked(); syncUrl();
+  const url = pageBase() + matchQuery() + '#' + LANG;
+  let ok = false;
+  try { await navigator.clipboard.writeText(url); ok = true; } catch (e) {
+    const ta = document.createElement('textarea');
+    ta.value = url; ta.setAttribute('readonly', ''); ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    try { ok = document.execCommand('copy'); } catch (e2) { ok = false; }
+    ta.remove();
+  }
+  $('share-text').textContent = tx(ok ? 'shareDone' : 'shareFail');
+  clearTimeout(copyShare.timer);
+  copyShare.timer = setTimeout(() => { $('share-text').textContent = tx('shareBtn'); }, 2200);
+}
+
+/* ==================================================================
+   ELO HISTORY (sparkline on the team cards, from engine.js eloRun's weekly ratings)
+   ================================================================== */
+function eloSpark(name, col) {
+  const h = S.st.eloHist && S.st.eloHist.get(name);
+  if (!h || h.length < 3) return '';
+  const W = 300, Hh = 46, pad = 3;
+  const d0 = h[0][0], d1 = Math.max(h[h.length - 1][0], d0 + 1);
+  let lo = Infinity, hi = -Infinity;
+  for (const [, r] of h) { if (r < lo) lo = r; if (r > hi) hi = r; }
+  if (hi - lo < 40) { const m = (hi + lo) / 2; lo = m - 20; hi = m + 20; }
+  const x = d => pad + (W - 2 * pad) * (d - d0) / (d1 - d0), y = r => pad + (Hh - 2 * pad) * (1 - (r - lo) / (hi - lo));
+  const line = h.map(([d, r], k) => `${k ? 'L' : 'M'}${x(d).toFixed(1)} ${y(r).toFixed(1)}`).join(' ');
+  const area = `${line} L${x(h[h.length - 1][0]).toFixed(1)} ${Hh} L${x(d0).toFixed(1)} ${Hh} Z`;
+  let guides = '';                      // season starts, as faint guides
+  for (const s of S.data.seasons) { const d = seasonStart(s); if (d > d0 && d < d1) guides += `<line x1="${x(d).toFixed(1)}" x2="${x(d).toFixed(1)}" y1="0" y2="${Hh}" stroke="var(--line)" stroke-dasharray="2 3" vector-effect="non-scaling-stroke"/>`; }
+  const now = h[h.length - 1][1], lastD = h[h.length - 1][0];
+  let past = h[0][1];
+  for (const [d, r] of h) { if (d <= lastD - 30) past = r; else break; }
+  const c = Math.round(now - past);
+  const sign = c > 0 ? '+' : c < 0 ? '−' : '±';
+  return `<div class="elo-hist">
+      <div class="row"><span>${esc(tx('eloSince', { date: fmtDay(d0, { month: 'short', year: 'numeric' }) }))}</span>
+        <span>${esc(tx('thElo'))} <b>${esc(fmtInt(Math.round(now)))}</b> · <span class="chg ${c > 0 ? 'up' : c < 0 ? 'down' : ''}" dir="ltr">${sign}${esc(fmtInt(Math.abs(c)))}</span> ${esc(tx('eloChg'))}</span></div>
+      <svg viewBox="0 0 ${W} ${Hh}" preserveAspectRatio="none" role="img" aria-label="${esc(tx('eloAria', { team: shortName(name), a: fmtInt(Math.round(h[0][1])), b: fmtInt(Math.round(now)) }))}">
+        ${guides}<path d="${area}" fill="${col}" fill-opacity="0.12"/>
+        <path d="${line}" fill="none" stroke="${col}" stroke-width="1.8" vector-effect="non-scaling-stroke" stroke-linejoin="round"/>
+      </svg>
+    </div>`;
+}
+
+/* ==================================================================
+   SEASON PROJECTIONS (engine.js simSetup / simRun; the Monte Carlo runs in a worker)
+   ================================================================== */
+function projWorker() {
+  const P = S.proj;
+  if (P.worker || P.noWorker) return P.worker;
+  try {
+    const src = `'use strict';
+(${matchlabEngine.toString()})(self);
+self.onmessage = e => { const t0 = Date.now(); const r = simRun(e.data.setup, e.data.opts); r.ms = Date.now() - t0; self.postMessage({ key: e.data.key, r }); };`;
+    const w = new Worker(URL.createObjectURL(new Blob([src], { type: 'text/javascript' })));
+    w.onmessage = e => { const job = P.jobs.get(e.data.key); P.jobs.delete(e.data.key); if (job) job.cb(e.data.r); };
+    w.onerror = e => {           // no worker after all: finish the queued simulations here
+      e.preventDefault(); w.terminate(); P.worker = null; P.noWorker = true;
+      for (const [key, job] of P.jobs) { P.jobs.delete(key); setTimeout(() => job.cb(simRun(job.setup, job.opts)), 20); }
+    };
+    P.worker = w;
+  } catch (e) { P.noWorker = true; P.worker = null; }
+  return P.worker;
+}
+// official point deductions: points in the official table minus 3 x wins + draws
+function projAdj(code) {
+  const m = new Map(), T = S.tables[code];
+  if (T && T.official) for (const r of T.rows) if (Number.isFinite(r.w) && Number.isFinite(r.d) && Number.isFinite(r.pts)) m.set(r.team, r.pts - (3 * r.w + r.d));
+  return m;
+}
+function requestProj(code) {
+  const P = S.proj;
+  if (P.cache.has(code) || P.pending.has(code)) return;
+  P.pending.add(code);
+  const token = S.projToken, adj = projAdj(code);
+  const setup = simSetup(S.st, code, { adj });
+  const cb = r => {
+    if (token !== S.projToken) return;
+    P.pending.delete(code); r.adj = [...adj.values()].some(v => v !== 0); P.cache.set(code, r);
+    if (S.projLeague === code) renderProjections();
+  };
+  const w = projWorker(), key = `${token}|${code}`, opts = { n: SIM.n, seed: SIM.seed };
+  if (w) { P.jobs.set(key, { setup, opts, cb }); w.postMessage({ key, setup, opts }); }
+  else setTimeout(() => cb(simRun(setup, opts)), 20);
+}
+const projPct = p => (p <= 0 ? '—' : p < 0.005 ? '<' + NF.pct0.format(0.01) : p > 0.995 && p < 1 ? '>' + NF.pct0.format(0.99) : NF.pct0.format(p));
+function renderProjections() {
+  if (!S.proj) return;
+  const lgs = LEAGUES.filter(l => S.tables[l.code] && S.tables[l.code].rows.length);
+  $('proj-sec').hidden = !lgs.length;
+  if (!lgs.length) return;
+  if (!S.projLeague || !lgs.some(l => l.code === S.projLeague)) {
+    const h = S.home && S.data.teamLeague.get(S.home);
+    S.projLeague = lgs.some(l => l.code === h) ? h : lgs[0].code;
+  }
+  $('proj-filter').innerHTML = lgs.map(l => `<button type="button" class="fchip" data-code="${l.code}" aria-pressed="${l.code === S.projLeague}">${esc(leagueName(l.code))}</button>`).join('');
+  $('proj-filter').onclick = e => { const b = e.target.closest('.fchip'); if (b) { S.projLeague = b.dataset.code; renderProjections(); } };
+  $('proj-sub').textContent = tx('projSub', { n: fmtInt(SIM.n) });
+  const R = S.proj.cache.get(S.projLeague);
+  if (!R) { $('proj').innerHTML = `<div class="proj-wait">${esc(tx('projRunning', { league: leagueName(S.projLeague) }))}</div>`; requestProj(S.projLeague); return; }
+  if (!R.remaining) { $('proj').innerHTML = `<div class="proj-wait">${esc(tx('projDone'))}</div>`; return; }
+  const z = R.zones, T = R.T;
+  const axis = Array.from({ length: T }, (_, k) => {
+    const p = k + 1, show = p === 1 || p === z.top || p === T - z.rel + 1 || p === T;
+    return `<span>${show ? p : ''}</span>`;
+  }).join('');
+  const cell = p => `<td class="r"><span class="pc${p <= 0 ? ' zero' : p >= 0.5 ? ' hot' : ''}" dir="ltr">${esc(projPct(p))}</span></td>`;
+  const body = R.teams.map((t, k) => {
+    const me = t.team === S.home || t.team === S.away;
+    const strip = t.pos.map((p, q) => {
+      const a = p < 0.005 ? 0 : Math.round(8 + 92 * Math.min(1, p / 0.45));   // linear: 45% or more is full colour
+      const zc = q < z.top ? 'zt' : q >= T - z.rel ? 'zr' : '';
+      return `<span${zc ? ` class="${zc}"` : ''}${a ? ` style="background:color-mix(in srgb, var(--home) ${a}%, var(--surface-2))"` : ''} title="${esc(tx('posTip', { pos: q + 1, p: pct1(p) }))}"></span>`;
+    }).join('');
+    return `<tr class="pick${me ? ' me' : ''}" data-name="${esc(t.team)}" tabindex="0" title="${esc(tx('rankRowTitle', { team: shortName(t.team) }))}">
+      <td class="num c-rank">${k + 1}</td>
+      <td class="tn" dir="auto"><b>${esc(shortName(t.team))}</b></td>
+      <td class="r num c-now">${esc(fmtInt(t.now.pts))} <span class="rg" style="display:inline">(${esc(fmtInt(t.now.p))})</span></td>
+      <td class="r"><span class="xp">${esc(dec(t.xPts, 0))}</span><span class="rg" dir="ltr">${esc(fmtInt(t.lo))}–${esc(fmtInt(t.hi))}</span></td>
+      ${cell(t.title)}${cell(t.top)}${cell(t.rel)}
+      <td class="c-pos"><div class="posbar" role="img" aria-label="${esc(tx('posAria', { team: shortName(t.team), pos: dec(t.xPos, 1) }))}">${strip}</div></td>
+    </tr>`;
+  }).join('');
+  const foot = [tx('projFoot', { p: fmtInt(R.played), t: fmtInt(R.played + R.remaining), r: fmtInt(R.remaining) }), tx('projTies')];
+  if (R.adj) foot.push(tx('projAdj'));
+  $('proj').innerHTML = `<table class="proj">
+    <thead><tr><th class="c-rank">#</th><th class="tn">${esc(tx('thTeam'))}</th><th class="r c-now" title="${esc(tx('thNowTip'))}">${esc(tx('thNow'))}</th>
+      <th class="r" title="${esc(tx('thProjTip'))}">${esc(tx('thProj'))}</th>
+      <th class="r">${esc(tx('thChamp'))}</th>
+      <th class="r" title="${esc(tx('thTopTip', { k: z.top }))}">${esc(tx('thTopK', { k: z.top }))}</th>
+      <th class="r" title="${esc(tx('thRelTip', { k: z.rel }))}">${esc(tx('thRel'))}</th>
+      <th class="c-pos">${esc(tx('thPosDist'))}<div class="posaxis" aria-hidden="true">${axis}</div></th></tr></thead>
+    <tbody>${body}</tbody></table>
+    <div class="tbl-foot">${foot.map(esc).join(' ')}</div>`;
+  const use = tr => {
+    const name = tr.dataset.name;
+    if (!S.home || S.home === name) S.away = name; else if (S.away !== name) { S.away = S.home; S.home = name; }
+    userPicked(); renderPicker(); renderResult(); renderProjections();
+    toPredictor();
+  };
+  $('proj').onclick = e => { const tr = e.target.closest('tr.pick'); if (tr) use(tr); };
+  $('proj').onkeydown = e => { if (e.key === 'Enter') { const tr = e.target.closest('tr.pick'); if (tr) use(tr); } };
+}
+
+/* ==================================================================
    WIRING
    ================================================================== */
 $('lang').innerHTML = LANGS.map(l => `<option value="${l.code}" lang="${l.code}">${esc(l.label)}</option>`).join('');
 $('lang').addEventListener('change', e => setLang(e.target.value, true));
 setupCombo('home');
 setupCombo('away');
-$('swap').addEventListener('click', () => { [S.home, S.away] = [S.away, S.home]; renderPicker(); renderResult(); });
-$('neutral').addEventListener('change', e => { S.neutral = e.target.checked; renderResult(); });
+$('swap').addEventListener('click', () => { [S.home, S.away] = [S.away, S.home]; userPicked(); renderPicker(); renderResult(); });
+$('neutral').addEventListener('change', e => { S.neutral = e.target.checked; userPicked(); renderResult(); });
+$('share').addEventListener('click', copyShare);
 $('reload').addEventListener('click', boot);
 setLang(detectLang(), false);
 boot();

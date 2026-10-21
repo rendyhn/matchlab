@@ -467,8 +467,9 @@ function dcRates(M, hi, ai, comp, neutral) {
    Goal-margin Elo, frozen for a week at a time (Monday to Sunday) like the model's weekly refits:
    every match of a week is rated with the ratings from before that week, then the week's results
    are applied. Starts from the collector's ratings (history back to 2018) when the snapshot has
-   them. Mirror of elo_run() in collector/collect.py. Sets r.edr = R_home - R_away before the match. */
-function eloRun(played, start) {
+   them. Mirror of elo_run() in collector/collect.py. Sets r.edr = R_home - R_away before the match.
+   hist (optional Map): filled with team -> [[day, rating], ...], the rating after each week it played. */
+function eloRun(played, start, hist) {
   const R = new Map(start ? start.ratings : []);
   let k = 0;
   while (k < played.length) {
@@ -487,6 +488,14 @@ function eloRun(played, start) {
       const s = r.hg > r.ag ? 1 : r.hg === r.ag ? 0.5 : 0;
       const d = CFG.eloK * gm * (s - e);
       R.set(r.h, R.get(r.h) + d); R.set(r.a, R.get(r.a) - d);
+    }
+    if (hist) {
+      const wkDay = new Map();
+      for (let i = k; i < j; i++) for (const t of [played[i].h, played[i].a]) wkDay.set(t, Math.max(wkDay.get(t) || 0, played[i].day));
+      for (const [t, day] of wkDay) {
+        if (!hist.has(t)) hist.set(t, []);
+        hist.get(t).push([day, R.get(t)]);
+      }
     }
     k = j;
   }
@@ -561,9 +570,10 @@ function eloMapProbs(mp, x, neutral) {
 function prepare(data, asof) {
   const TI = teamIndex(data.played, data.teamLeague.keys());
   const M = fitModel(data.played, asof, TI, null);
-  const elo = eloRun(data.played, data.eloStart);
+  const eloHist = new Map();
+  const elo = eloRun(data.played, data.eloStart, eloHist);
   const map = eloMapFit(data.played, asof, null);
-  return { data, TI, M, elo, map, asof };
+  return { data, TI, M, elo, eloHist, map, asof };
 }
 
 // MatchLab's forecast: (1 - eloWeight) x Dixon-Coles + eloWeight x Elo. The score grid is Dixon-Coles'
@@ -734,6 +744,171 @@ function eceOf(bins) {
   return n ? e / n : 0;
 }
 
+/* ------------------------------------------------------------------ season simulation
+   Monte Carlo of the rest of a league season. Every remaining match is drawn from MatchLab's own
+   forecast (the blended 1X2, then a score from its grid), so the projection agrees with the match
+   numbers on the page. Over a season teams change (form, injuries, transfers, coaches) and today's
+   ratings are only estimates, so in each simulated season every team's strength takes a random
+   walk on the log-odds scale of the 1X2: a starting offset (sd base) plus drift (sd drift per
+   square root of 100 days). base 0.1 / drift 0.3 scored best on 2024/25 among 20 settings and was
+   better than no uncertainty on 2025/26 too, though within noise in both (model-lab/sim_test.mjs,
+   model-lab/RESULTS.md).
+   Ties on points are split by goal difference, then goals scored, then at random - the leagues'
+   own head-to-head rules are not modelled. Not part of CFG: it changes no match forecast. */
+const SIM = { n: 10000, base: 0.1, drift: 0.3, seed: 20260921 };
+// places shown per league: top = the "top" column, rel = places relegated directly (play-off places not included)
+const ZONES = {
+  'en.1': { top: 4, rel: 3 }, 'es.1': { top: 4, rel: 3 }, 'de.1': { top: 4, rel: 2 }, 'it.1': { top: 4, rel: 3 },
+  'fr.1': { top: 4, rel: 2 }, 'nl.1': { top: 4, rel: 2 }, 'pt.1': { top: 4, rel: 2 }, 'en.2': { top: 2, rel: 3 },
+};
+// small fast generator (mulberry32): the same seed gives the same projection, so the numbers do
+// not jitter between renders; period 2^32, far more than one projection draws
+function rng32(seed) {
+  let x = seed >>> 0;
+  const next = () => {
+    x = (x + 0x6D2B79F5) | 0;
+    let t = Math.imul(x ^ (x >>> 15), 1 | x);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  return { next };
+}
+// This season's league table from the results in data.played before asof. adj: team -> points
+// adjustment (deductions from the official table), optional.
+function leagueTable(data, code, asof, adj) {
+  const rows = new Map();
+  for (const [t, c] of data.teamLeague) if (c === code) rows.set(t, { team: t, p: 0, w: 0, d: 0, l: 0, gf: 0, ga: 0, adj: (adj && adj.get(t)) || 0 });
+  for (const r of data.played) {
+    if (r.day >= asof) break;
+    if (r.cup || r.comp !== code || r.season !== data.cur || !rows.has(r.h) || !rows.has(r.a)) continue;
+    for (const [t, gf, ga] of [[r.h, r.hg, r.ag], [r.a, r.ag, r.hg]]) {
+      const x = rows.get(t); x.p++; x.gf += gf; x.ga += ga;
+      if (gf > ga) x.w++; else if (gf === ga) x.d++; else x.l++;
+    }
+  }
+  for (const x of rows.values()) { x.gd = x.gf - x.ga; x.pts = 3 * x.w + x.d + x.adj; }
+  return rows;
+}
+// The matches still to play: every home-away pair of the league (all eight are double round-robins)
+// that has no result yet, dated from the fixture list where it has one.
+function remainingMatches(data, code, asof, teams) {
+  const playedPairs = new Set(), when = new Map();
+  for (const r of data.played) if (!r.cup && r.comp === code && r.season === data.cur && r.day < asof) playedPairs.add(`${r.h}|${r.a}`);
+  let lastDay = asof;
+  for (const f of data.fixtures) if (f.comp === code && !f.cup) { when.set(`${f.h}|${f.a}`, f.day); if (f.day > lastDay) lastDay = f.day; }
+  const out = [];
+  for (const h of teams) for (const a of teams) {
+    if (h === a || playedPairs.has(`${h}|${a}`)) continue;
+    const d = when.get(`${h}|${a}`);
+    out.push({ h, a, day: d === undefined ? lastDay : Math.max(d, asof) });
+  }
+  out.sort((x, y) => x.day - y.day || cmpStr(x.h, y.h));
+  return out;
+}
+const logit = p => Math.log(Math.max(p, 1e-9) / Math.max(1 - p, 1e-9));
+// standard normal quantiles at the midpoints of 4096 equal-probability slices (Acklam's inverse
+// normal): a draw is one uniform and a table look-up, fast enough for millions per projection
+const ZTAB = (() => {
+  const a = [-39.69683028665376, 220.9460984245205, -275.9285104469687, 138.3577518672690, -30.66479806614716, 2.506628277459239];
+  const b = [-54.47609879822406, 161.5858368580409, -155.6989798598866, 66.80131188771972, -13.28068155288572];
+  const c = [-0.007784894002430293, -0.3223964580411365, -2.400758277161838, -2.549732539343734, 4.374664141464968, 2.938163982698783];
+  const d = [0.007784695709041462, 0.3224671290700398, 2.445134137142996, 3.754408661907416];
+  const inv = p => {
+    if (p < 0.02425) { const q = Math.sqrt(-2 * Math.log(p)); return (((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5]) / ((((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1); }
+    if (p > 1 - 0.02425) return -inv(1 - p);
+    const q = p - 0.5, r = q * q;
+    return (((((a[0] * r + a[1]) * r + a[2]) * r + a[3]) * r + a[4]) * r + a[5]) * q / (((((b[0] * r + b[1]) * r + b[2]) * r + b[3]) * r + b[4]) * r + 1);
+  };
+  const t = new Float64Array(4096);
+  for (let k = 0; k < 4096; k++) t[k] = inv((k + 0.5) / 4096);
+  return t;
+})();
+// logistic quantiles at the midpoints of 65536 slices: a logistic draw without a logarithm
+const LTAB = (() => { const t = new Float32Array(65536); for (let k = 0; k < 65536; k++) { const p = (k + 0.5) / 65536; t[k] = Math.log(p / (1 - p)); } return t; })();
+// Everything the Monte Carlo needs, as plain arrays (so it can be posted to a worker): the table now,
+// and per remaining match the 1X2 cut points, the drift step sizes and the score tables.
+// opts: { base, drift, adj (Map team -> points adjustment), maxGoals }
+function simSetup(st, code, opts) {
+  const o = Object.assign({}, SIM, opts || {});
+  const data = st.data, asof = st.asof;
+  const table = leagueTable(data, code, asof, o.adj);
+  const teams = [...table.keys()].filter(t => st.TI.idx.has(t)).sort(cmpStr);
+  const T = teams.length, ti = new Map(teams.map((t, i) => [t, i]));
+  const rem = remainingMatches(data, code, asof, teams);
+  const K = rem.length, cap = o.maxGoals || 8;
+  const MH = new Int32Array(K), MA = new Int32Array(K), LA = new Float64Array(K), LAD = new Float64Array(K);
+  const SH = new Float64Array(K), SA = new Float64Array(K), last = new Float64Array(T).fill(asof);
+  const dsd = o.drift / 10;                              // per square root of a day (100 days -> drift)
+  // score tables of all matches in three flat arrays: entries OFF[3m+k] .. OFF[3m+k+1]-1 hold the
+  // scores of outcome k (0 home win, 1 draw, 2 away win) of match m with their cumulative probability
+  const cumL = [], giL = [], gjL = [], OFF = new Int32Array(3 * K + 1);
+  for (let m = 0; m < K; m++) {
+    const r = rem[m], P = forecast(st, r.h, r.a, code, false);
+    MH[m] = ti.get(r.h); MA[m] = ti.get(r.a);
+    LA[m] = logit(P.pA); LAD[m] = logit(P.pA + P.pD);
+    // drift since the team's previous match (each team's dates are fixed): sd of the step
+    SH[m] = dsd * Math.sqrt(Math.max(0, r.day - last[MH[m]])); last[MH[m]] = Math.max(last[MH[m]], r.day);
+    SA[m] = dsd * Math.sqrt(Math.max(0, r.day - last[MA[m]])); last[MA[m]] = Math.max(last[MA[m]], r.day);
+    const cls = [[], [], []], g = Math.min(cap, P.maxg);
+    for (let i = 0; i <= g; i++) for (let j = 0; j <= g; j++) cls[i > j ? 0 : i === j ? 1 : 2].push([i, j, P.grid[i][j]]);
+    for (let k = 0; k < 3; k++) {
+      OFF[3 * m + k] = cumL.length;
+      let tot = 0; for (const x of cls[k]) tot += x[2];
+      let acc = 0;
+      for (const x of cls[k]) { acc += x[2] / (tot || 1); cumL.push(acc); giL.push(x[0]); gjL.push(x[1]); }
+      if (cls[k].length) cumL[cumL.length - 1] = 1;
+    }
+  }
+  OFF[3 * K] = cumL.length;
+  const CUM = Float64Array.from(cumL), GI = Int8Array.from(giL), GJ = Int8Array.from(gjL);
+  const now = teams.map(t => table.get(t));
+  return { code, teams, now, T, K, MH, MA, LA, LAD, SH, SA, OFF, CUM, GI, GJ, base: o.base, drift: o.drift, zones: ZONES[code] || { top: 4, rel: 3 } };
+}
+// The Monte Carlo itself: pure arithmetic on simSetup's arrays. opts: { n, seed }
+function simRun(S0, opts) {
+  const o = Object.assign({}, SIM, opts || {});
+  const { T, K, MH, MA, LA, LAD, SH, SA, OFF, CUM, GI, GJ, now } = S0;
+  const R = rng32(o.seed), N = o.n, next = R.next;
+  const pos = new Float64Array(T * T), ptsAll = new Int16Array(N * T);
+  const pts = new Float64Array(T), gd = new Float64Array(T), gf = new Float64Array(T), u = new Float64Array(T), tie = new Float64Array(T);
+  const order = Array.from({ length: T }, (_, i) => i);
+  const cmp = (x, y) => pts[y] - pts[x] || gd[y] - gd[x] || gf[y] - gf[x] || tie[y] - tie[x];
+  const drift = S0.drift > 0, b0 = S0.base;
+  for (let s = 0; s < N; s++) {
+    for (let i = 0; i < T; i++) { pts[i] = now[i].pts; gd[i] = now[i].gd; gf[i] = now[i].gf; u[i] = b0 > 0 ? b0 * ZTAB[(next() * 4096) | 0] : 0; tie[i] = next(); }
+    for (let m = 0; m < K; m++) {
+      const h = MH[m], a = MA[m];
+      if (drift) { u[h] += SH[m] * ZTAB[(next() * 4096) | 0]; u[a] += SA[m] * ZTAB[(next() * 4096) | 0]; }
+      // outcome by a logistic draw: away if g < logit P(away), draw if g < logit P(away or draw);
+      // a team-strength shift moves both cut points (an ordered logit)
+      const g = LTAB[(next() * 65536) | 0] + u[h] - u[a];
+      const k = g < LA[m] ? 2 : g < LAD[m] ? 1 : 0;
+      let lo = OFF[3 * m + k], hi = OFF[3 * m + k + 1] - 1; const w = next();
+      while (lo < hi) { const mid = (lo + hi) >> 1; if (CUM[mid] < w) lo = mid + 1; else hi = mid; }
+      const gh = GI[lo], ga = GJ[lo];
+      if (k === 0) pts[h] += 3; else if (k === 1) { pts[h] += 1; pts[a] += 1; } else pts[a] += 3;
+      gd[h] += gh - ga; gd[a] += ga - gh; gf[h] += gh; gf[a] += ga;
+    }
+    order.sort(cmp);
+    for (let p = 0; p < T; p++) pos[order[p] * T + p]++;
+    for (let i = 0; i < T; i++) ptsAll[s * T + i] = pts[i];
+  }
+  const z = S0.zones;
+  const out = S0.teams.map((t, i) => {
+    const P = Array.from(pos.subarray(i * T, i * T + T), c => c / N);
+    const ps = new Int16Array(N); for (let s = 0; s < N; s++) ps[s] = ptsAll[s * T + i];
+    ps.sort();
+    let mean = 0; for (let s = 0; s < N; s++) mean += ps[s]; mean /= N;
+    const q = f => ps[Math.min(N - 1, Math.max(0, Math.round(f * (N - 1))))];
+    const sum = (a, b) => P.slice(a, b).reduce((x, y) => x + y, 0);
+    return { team: t, now: now[i], pos: P, xPts: mean, lo: q(0.05), hi: q(0.95), xPos: P.reduce((acc, p, k) => acc + p * (k + 1), 0),
+      title: P[0], top: sum(0, z.top), rel: sum(T - z.rel, T) };
+  });
+  out.sort((x, y) => y.xPts - x.xPts || x.xPos - y.xPos || cmpStr(x.team, y.team));
+  return { code: S0.code, teams: out, T, n: N, remaining: K, played: now.reduce((acc, x) => acc + x.p, 0) / 2, zones: z, base: S0.base, drift: S0.drift };
+}
+const simulateLeague = (st, code, opts) => simRun(simSetup(st, code, opts), opts);
+
 /* ------------------------------------------------------------------ forecast archive (live track record)
    Every fixture of the next 7 days gets a forecast; it is updated on each run until the match day
    begins (00:00 UTC), then locked for good, and scored once the result is in. The archive lives in
@@ -797,6 +972,23 @@ function trackSummary(archive, nowMs) {
   const locked = all.filter(e => !e.res && !e.void && parseDay(e.d) <= today).length;
   const open = all.filter(e => !e.res && !e.void && parseDay(e.d) > today).length;
   let since = null; for (const e of all) if (!since || e.first < since) since = e.first;
+  // per competition, and a running total by match day (for the page's chart): n, log-loss sum,
+  // and on the matches with market odds: n, MatchLab's log-loss sum, the market's log-loss sum
+  const comps = new Map();
+  for (const e of done) {
+    if (!comps.has(e.comp)) comps.set(e.comp, { comp: e.comp, n: 0, ll: 0, acc: 0, nm: 0, llm: 0, mll: 0 });
+    const c = comps.get(e.comp); c.n++; c.ll += e.ll; c.acc += e.p.indexOf(Math.max(...e.p)) === e.o ? 1 : 0;
+    if (e.mkt && e.mll !== undefined) { c.nm++; c.llm += e.ll; c.mll += e.mll; }
+  }
+  const byComp = [...comps.values()].sort((a, b) => b.n - a.n || cmpStr(a.comp, b.comp))
+    .map(c => ({ comp: c.comp, n: c.n, ll: r4(c.ll / c.n), acc: r4(c.acc / c.n), nm: c.nm, llm: c.nm ? r4(c.llm / c.nm) : null, mll: c.nm ? r4(c.mll / c.nm) : null }));
+  const days = new Map();
+  for (const e of done) {
+    if (!days.has(e.played)) days.set(e.played, [0, 0, 0, 0, 0]);
+    const x = days.get(e.played); x[0]++; x[1] += e.ll;
+    if (e.mkt && e.mll !== undefined) { x[2]++; x[3] += e.ll; x[4] += e.mll; }
+  }
+  const series = [...days.entries()].sort((a, b) => cmpStr(a[0], b[0])).map(([d, x]) => [d, x[0], r4(x[1]), x[2], r4(x[3]), r4(x[4])]);
   return {
     generated: new Date(nowMs).toISOString().slice(0, 19) + 'Z', model: ENGINE_VERSION, cfg: CFG_HASH, since,
     total: all.length, settled: done.length, locked, open, void: all.filter(e => e.void).length,
@@ -804,7 +996,7 @@ function trackSummary(archive, nowMs) {
     acc: mean(done, e => (e.p.indexOf(Math.max(...e.p)) === e.o ? 1 : 0)),
     llDc: mean(done, e => -Math.log(Math.max(e.dc[e.o], 1e-12))), llElo: mean(done, e => -Math.log(Math.max(e.elo[e.o], 1e-12))),
     market: withM.length ? { n: withM.length, ll: mean(withM, e => e.mll), llModel: mean(withM, e => e.ll) } : null,
-    recent,
+    recent, byComp, series,
   };
 }
 
@@ -815,6 +1007,7 @@ Object.assign(root, {
   teamIndex, fitModel, goalsCap, poissonVec, homeAdv, dcProbs, dcRates,
   eloRun, eloOf, eloMapFit, eloMapProbs, prepare, forecast, laplace, forecastRange, strengthSe,
   scoreOne, walkForward, eceOf, forecastKey, issueForecasts, settleForecasts, trackSummary,
+  SIM, ZONES, rng32, leagueTable, remainingMatches, simSetup, simRun, simulateLeague,
   matchlabEngine,
 });
 }
