@@ -2,8 +2,8 @@
 """MatchLab - data collector.
 
 Merges five sources into data/latest.json (+ data/latest.js for pages opened from disk):
-  openfootball      results + fixtures, 8 leagues      (the canonical team names)
-  football-data.org results, official standings, UEFA Champions League 2025/26 + 2026/27
+  ESPN              results + fixtures + shots, 14 leagues, 4 second tiers, 3 UEFA cups (the team names)
+  football-data.org official standings (point deductions), results cross-check, 8 leagues
   Understat         expected goals (xG) per match, top-5 leagues
   OpenLigaDB        Bundesliga results (cross-check)
   The Odds API      bookmaker 1X2 odds for upcoming matches (refreshed at most every N hours)
@@ -48,8 +48,12 @@ LEAGUES = {
 }
 HISTORY_ONLY = ["es.2", "de.2", "it.2", "fr.2"]
 CUP = {"code": "uefa.cl", "fd": "CL", "odds": "soccer_uefa_champs_league"}
+# odds for the three UEFA cups as well (11 credits a refresh; the six leagues v7 adds have none,
+# which keeps a daily refresh inside the free 500 credits a month)
+CUP_ODDS = {"uefa.cl": "soccer_uefa_champs_league", "uefa.el": "soccer_uefa_europa_league",
+            "uefa.ecl": "soccer_uefa_europa_conference_league"}
 
-if "--log" in sys.argv[1:-1]:
+if __name__ == "__main__" and "--log" in sys.argv[1:-1]:
     # pythonw has no console: send the run's output there, overwritten each run
     _log_path = os.path.abspath(sys.argv[sys.argv.index("--log") + 1])
     os.makedirs(os.path.dirname(_log_path), exist_ok=True)
@@ -301,7 +305,7 @@ def elo_run(rows, ratings=None, cfg=ELO):
     return dr, R
 
 
-# ------------------------------------------------------------------ openfootball
+# ------------------------------------------------------------------ openfootball (v6's source; model-lab's LAB_SOURCE=of only)
 def score_ft(sc, d, today):
     ft = None
     if isinstance(sc, dict) and isinstance(sc.get("ft"), list):
@@ -317,100 +321,49 @@ def score_ft(sc, d, today):
     return (a, b) if a >= 0 and b >= 0 else None
 
 
-def load_openfootball(y0):
-    today = date.today()
-    played, fixtures = [], []
-    status = {"files": 0, "missing": 0}
-    for y in (y0, y0 - 1, y0 - 2):
-        s = skey(y)
-        for code, kind in [(c, "league") for c in LEAGUES] + [(c, "history") for c in HISTORY_ONLY] + [(CUP["code"], "cup")]:
-            key = f"of_{s}_{code}"
-            try:
-                j, meta = cached(key, lambda: json.loads(http(f"{OF_BASE}{s}/{code}.json")[0]), 0.5 if y == y0 else 24 * 30)
-            except urllib.error.HTTPError as e:
-                if e.code == 404:
-                    status["missing"] += 1
-                    continue
-                raise
-            status["files"] += 1
-            for m in j.get("matches", []):
-                if not m.get("team1") or not m.get("team2") or not m.get("date"):
-                    continue
-                d = date.fromisoformat(m["date"])
-                rnd = (m.get("round") or "").lower()
-                rec = {"d": d, "time": m.get("time", ""), "h": clean(m["team1"]), "a": clean(m["team2"]), "comp": code, "season": s, "cup": kind == "cup",
-                       # play-offs repeat a league pairing inside the same season, so they are told apart
-                       "reg": not rnd or rnd.startswith("matchday")}
-                ft = score_ft(m.get("score"), d, today)
-                if ft:
-                    rec["hg"], rec["ag"] = ft
-                    played.append(rec)
-                elif kind == "league" and y == y0:
-                    fixtures.append(rec)
-    last = max((r["d"] for r in played if r["season"] == skey(y0) and not r["cup"]), default=None)
-    status.update(ok=True, played=len(played), fixtures=len(fixtures), lastMatch=last and last.isoformat())
-    return played, fixtures, status
+# ------------------------------------------------------------------ ESPN
+def espn_labels(matches):
+    """ESPN team id -> one display name: the latest it carried; a name two ids share gets the id appended."""
+    import espn as E
+    names = E.team_names(matches)
+    by_name = defaultdict(list)
+    for i, n in names.items():
+        by_name[n].append(i)
+    return {i: (n if len(by_name[n]) == 1 else f"{n} #{i}") for i, n in names.items()}
 
 
-def elo_start(y0, fd=None, first=2018):
-    """Elo ratings on 1 July of y0-2 - where the three seasons the page loads begin - from every
-    season since `first`. The page carries them forward through its own data; with only three
-    seasons of history Elo is much weaker (model-lab/RESULTS.md)."""
+def elo_start(y0, matches, label, first=2018):
+    """Elo ratings on 1 July of y0-2 - where the three seasons the page loads begin - from every ESPN
+    result since `first` (all competitions). The page carries them forward through its own data; with
+    only three seasons of history Elo is much weaker (model-lab/RESULTS.md)."""
     start = date(y0 - 2, 7, 1)
-    today = date.today()
-    rows, names, cup_seasons = [], [], set()
-    for y in range(first, y0 + 1):
-        s = skey(y)
-        for code in list(LEAGUES) + HISTORY_ONLY + [CUP["code"]]:
-            age = 0.5 if y == y0 else (24 * 30 if y >= y0 - 2 else None)
-            try:
-                j, _ = cached(f"of_{s}_{code}", lambda: json.loads(http(f"{OF_BASE}{s}/{code}.json")[0]), age)
-            except Exception:
-                continue
-            if code == CUP["code"]:
-                cup_seasons.add(s)
-            for m in j.get("matches", []):
-                if not m.get("team1") or not m.get("team2") or not m.get("date"):
-                    continue
-                d = date.fromisoformat(m["date"])
-                h, a = clean(m["team1"]), clean(m["team2"])
-                names += [(h, s, code, d.toordinal()), (a, s, code, d.toordinal())]
-                ft = score_ft(m.get("score"), d, today)
-                if ft and d < start:
-                    rows.append({"d": d, "h": h, "a": a, "hg": ft[0], "ag": ft[1], "comp": code, "s": s})
-    # Champions League seasons before the window that openfootball lacks (football-data.org's free tier reaches 2023/24)
-    if fd:
-        for y in range(2023, y0 - 2):
-            if skey(y) in cup_seasons:
-                continue
-            try:
-                nm = NameMap()
-                for code, L in LEAGUES.items():
-                    j, _ = cached(f"fd_{L['fd']}_{y}", lambda: fd.get(f"/competitions/{L['fd']}/matches?season={y}"), None)
-                    nm.learn([(utc_day(m["utcDate"]), m["homeTeam"]["name"], m["awayTeam"]["name"]) for m in j.get("matches", [])
-                              if (m.get("homeTeam") or {}).get("name")],
-                             [(r["d"], r["h"], r["a"]) for r in rows if r["comp"] == code and r["s"] == skey(y)])
-                pool = {n for n, *_ in names}
-                j, _ = cached(f"fd_CL_{y}", lambda: fd.get(f"/competitions/CL/matches?season={y}"), None)
-                for m in j.get("matches", []):
-                    hn, an = (m.get("homeTeam") or {}).get("name"), (m.get("awayTeam") or {}).get("name")
-                    sc = fd_score(m) if hn and an and m.get("status") == "FINISHED" else None
-                    if sc:
-                        d = utc_day(m["utcDate"])
-                        h, a = nm.get(hn, pool, 0.85) or clean(hn), nm.get(an, pool, 0.85) or clean(an)
-                        names += [(h, skey(y), CUP["code"], d.toordinal()), (a, skey(y), CUP["code"], d.toordinal())]
-                        if d < start:
-                            rows.append({"d": d, "h": h, "a": a, "hg": sc[0], "ag": sc[1], "comp": CUP["code"], "s": skey(y)})
-            except Exception as e:
-                log(f"  Elo: Champions League {y} unavailable ({str(e)[:80]})")
-    cmap = canonical_names(names, CUP["code"])
-    for r in rows:
-        r["h"], r["a"] = cmap[r["h"]], cmap[r["a"]]
+    rows = [{"d": date.fromisoformat(m["d"]), "h": label[m["hi"]], "a": label[m["ai"]], "hg": m["hg"], "ag": m["ag"], "comp": m["comp"]}
+            for m in matches if "hg" in m and not m.get("et") and int(m["season"][:4]) >= first and m["d"] < start.isoformat()]
     rows.sort(key=lambda r: r["d"])
     _, R = elo_run(rows)
-    return {"v": 1, "start": start.isoformat(), "matches": len(rows), "first": skey(first),
-            "cfg": ELO, "ratings": {t: round(v, 2) for t, v in sorted(R.items())},
-            "alias": {k: v for k, v in sorted(cmap.items()) if k != v}}
+    return {"v": 2, "start": start.isoformat(), "matches": len(rows), "first": skey(first), "source": "ESPN",
+            "cfg": ELO, "ratings": {t: round(v, 2) for t, v in sorted(R.items())}}
+
+
+def matches_section(matches, label, y0):
+    """The page's results and fixtures, compact: see decodeMatches() in engine.js for the row layout."""
+    import espn as E
+    comps = list(E.COMPS)
+    keep = [m for m in matches if int(m["season"][:4]) >= y0 - 2]
+    ids = sorted({m["hi"] for m in keep} | {m["ai"] for m in keep}, key=lambda i: label[i])
+    ti = {i: k for k, i in enumerate(ids)}
+    a, b = E.SHOT_COEF
+    rows = []
+    for m in keep:
+        d = date.fromisoformat(m["d"])
+        sx = [None, None]
+        if "hsot" in m and "hs" in m:
+            sx = [round(a * m["hsot"] + b * (m["hs"] - m["hsot"]), 2), round(a * m["asot"] + b * (m["as"] - m["asot"]), 2)]
+        stage = m.get("stage", "")
+        rows.append([int(m["id"]), (d - date(1970, 1, 1)).days, m["t"], comps.index(m["comp"]), int(m["season"][:4]),
+                     ti[m["hi"]], ti[m["ai"]], m.get("hg"), m.get("ag"), sx[0], sx[1],
+                     (1 if m.get("et") else 0) | (2 if m.get("neutral") else 0), "" if stage in ("regular-season", "") else stage])
+    return {"v": 1, "comps": comps, "shot": list(E.SHOT_COEF), "teams": [[int(i), label[i]] for i in ids], "rows": rows}
 
 
 # ------------------------------------------------------------------ football-data.org
@@ -454,6 +407,7 @@ def utc_day(s):
 
 # ------------------------------------------------------------------ main
 def main():
+    import espn as E
     t_start = time.time()
     cfg = load_config()
     y0 = season_start_year()
@@ -466,104 +420,75 @@ def main():
         except Exception:
             prev = {}
     sources = {}
-    snap = {"schema": 1, "season": skey(y0)}
+    snap = {"schema": 2, "season": skey(y0)}
 
-    # 1. openfootball: canonical names + the base results -----------------------
-    log("openfootball ...")
-    of_played, of_fix, sources["openfootball"] = load_openfootball(y0)
-    canon_by_comp = defaultdict(set)
-    for r in of_played + of_fix:
-        canon_by_comp[r["comp"]].update((r["h"], r["a"]))
-    all_canon = set().union(*canon_by_comp.values())
-    of_rows = defaultdict(list)            # comp -> [(d, h, a)] played
-    of_fix_rows = defaultdict(list)        # comp -> [(d, h, a)] upcoming
-    # A regular-season pairing happens once per season, so (season, league, home, away, regular) identifies a
-    # match even when it was rescheduled - matching on dates would count a postponed match twice. Play-offs
-    # (Championship semi-finals, relegation play-offs) can repeat a pairing, hence the 'regular' flag.
-    of_pairs = {}
-    for r in of_played:
-        of_rows[r["comp"]].append((r["d"], r["h"], r["a"]))
-        if not r["cup"]:
-            of_pairs[(r["season"], r["comp"], r["h"], r["a"], r["reg"])] = r
-    for r in of_fix:
-        of_fix_rows[r["comp"]].append((r["d"], r["h"], r["a"]))
-    log(f"  {len(of_played)} played, {len(of_fix)} fixtures, last {sources['openfootball']['lastMatch']}")
+    # 1. ESPN: every result and fixture since 2018 (the page gets the last three seasons) -------------
+    log("ESPN ...")
+    ms, errs = E.load(first=2018, max_age_hours=1.5)
+    label = espn_labels(ms)
+    win = [m for m in ms if int(m["season"][:4]) >= y0 - 2]
+    played = [m for m in win if "hg" in m]
+    cur_played = [m for m in played if m["season"] == skey(y0)]
+    sources["ESPN"] = {"ok": bool(cur_played), "matches": len(played), "fixtures": sum("hg" not in m for m in win),
+                       "competitions": len(E.COMPS), "errors": errs[:5], "failedMonths": len(errs),
+                       "lastMatch": max((m["d"] for m in cur_played), default=None)}
+    log(f"  {len(played)} results and {sources['ESPN']['fixtures']} fixtures in the page's seasons, "
+        f"{len(errs)} months unavailable, last {sources['ESPN']['lastMatch']}")
+    matches = matches_section(ms, label, y0) if cur_played else (prev.get("matches") or None)
+    if not cur_played and prev.get("matches"):
+        sources["ESPN"]["carriedOver"] = prev.get("generated")
+    # rows per competition with ESPN's names, for the other sources' name matching
+    rows_by = defaultdict(list)            # comp -> [(d, h, a)] results and fixtures of the page's seasons
+    pair = {}                              # (comp, h, a, d) -> ESPN match
+    for m in win:
+        d = date.fromisoformat(m["d"])
+        h, a = label[m["hi"]], label[m["ai"]]
+        rows_by[m["comp"]].append((d, h, a))
+        pair[(m["comp"], h, a, d)] = m
+    teams_by = {c: {t for _, h, a in r for t in (h, a)} for c, r in rows_by.items()}
+    all_teams = set().union(*teams_by.values()) if teams_by else set()
 
-    def find_of(season, code, h, a, reg=True):
-        return of_pairs.get((season, code, h, a, reg))
+    def find(code, h, a, d, tol=3):
+        for k in sorted(range(-tol, tol + 1), key=abs):
+            m = pair.get((code, h, a, d + timedelta(days=k)))
+            if m:
+                return m, d + timedelta(days=k)
+        return None, None
 
-    extra, cup_fixtures, conflicts = [], [], []
-    xg = {}
-    standings = {}
-    fd_names = NameMap()
+    xg, standings, conflicts = {}, {}, []
 
-    # 2. football-data.org ----------------------------------------------------------
-    fd = None
+    # 2. football-data.org: official tables (point deductions) and a results cross-check ------------
     if cfg["football_data_org_key"]:
         log("football-data.org ...")
         fd = FootballDataOrg(cfg["football_data_org_key"])
         st = {"ok": True, "errors": []}
-        fd_league = {}
         try:
+            fd_names = NameMap()
+            fd_league = {}
             for code, L in LEAGUES.items():
-                for y, age in ((y0, 0.5), (y0 - 1, None)):
-                    try:
-                        j, meta = cached(f"fd_{L['fd']}_{y}", lambda: fd.get(f"/competitions/{L['fd']}/matches?season={y}"), age)
-                        fd_league[(code, y)] = j.get("matches", [])
-                    except Exception as e:
-                        st["errors"].append(f"{L['fd']} {y}: {str(e)[:80]}")
-            # learn fd -> openfootball names from league matches
-            for (code, y), ms in fd_league.items():
-                rows = [(utc_day(m["utcDate"]), m["homeTeam"]["name"], m["awayTeam"]["name"]) for m in ms if m.get("homeTeam", {}).get("name")]
-                fd_names.learn(rows, of_rows[code] + of_fix_rows[code])
-            last_fd = None
-            for (code, y), ms in fd_league.items():
-                for m in ms:
+                try:
+                    j, _ = cached(f"fd_{L['fd']}_{y0}", lambda: fd.get(f"/competitions/{L['fd']}/matches?season={y0}"), 0.5)
+                    fd_league[code] = j.get("matches", [])
+                except Exception as e:
+                    st["errors"].append(f"{L['fd']} {y0}: {str(e)[:80]}")
+            for code, mlist in fd_league.items():
+                fd_names.learn([(utc_day(m["utcDate"]), m["homeTeam"]["name"], m["awayTeam"]["name"]) for m in mlist
+                                if (m.get("homeTeam") or {}).get("name")], rows_by[code])
+            last_fd, checked = None, 0
+            for code, mlist in fd_league.items():
+                for m in mlist:
                     if m.get("status") != "FINISHED":
                         continue
                     sc = fd_score(m)
-                    h = fd_names.get(m["homeTeam"]["name"], canon_by_comp[code])
-                    a = fd_names.get(m["awayTeam"]["name"], canon_by_comp[code])
-                    if not sc or not h or not a:
-                        continue
+                    h, a = fd_names.get(m["homeTeam"]["name"], teams_by.get(code)), fd_names.get(m["awayTeam"]["name"], teams_by.get(code))
                     d = utc_day(m["utcDate"])
-                    if y == y0:
-                        last_fd = max(last_fd or d, d)
-                    r = find_of(skey(y), code, h, a, m.get("stage", "REGULAR_SEASON") == "REGULAR_SEASON")
-                    if r:
-                        if (r["hg"], r["ag"]) != tuple(sc):
-                            conflicts.append({"d": r["d"].isoformat(), "h": h, "a": a, "comp": code,
-                                              "scores": {"openfootball": f"{r['hg']}-{r['ag']}", "football-data.org": f"{sc[0]}-{sc[1]}"}})
-                    else:
-                        # a result openfootball does not have (yet): take it, on openfootball's date if the fixture exists
-                        fx = next((f for f in of_fix if f["comp"] == code and f["h"] == h and f["a"] == a and abs((f["d"] - d).days) <= 1), None)
-                        extra.append({"d": (fx["d"] if fx else d).isoformat(), "h": h, "a": a, "hg": sc[0], "ag": sc[1],
-                                      "comp": code, "season": skey(y), "cup": False, "src": "football-data.org"})
-            # Champions League: previous and current season (openfootball has neither)
-            for y, age in ((y0, 0.5), (y0 - 1, None)):
-                try:
-                    j, meta = cached(f"fd_CL_{y}", lambda: fd.get(f"/competitions/CL/matches?season={y}"), age)
-                except Exception as e:
-                    st["errors"].append(f"CL {y}: {str(e)[:80]}")
-                    continue
-                pool = all_canon
-                for m in j.get("matches", []):
-                    hn, an = (m.get("homeTeam") or {}).get("name"), (m.get("awayTeam") or {}).get("name")
-                    if not hn or not an:
-                        continue
-                    h = fd_names.get(hn, pool, 0.85) or clean(hn)
-                    a = fd_names.get(an, pool, 0.85) or clean(an)
-                    d = utc_day(m["utcDate"])
-                    if m.get("status") == "FINISHED":
-                        sc = fd_score(m)
-                        if sc:
-                            extra.append({"d": d.isoformat(), "h": h, "a": a, "hg": sc[0], "ag": sc[1], "comp": CUP["code"],
-                                          "season": skey(y), "cup": True, "src": "football-data.org",
-                                          "stage": m.get("stage", "")})
-                    elif y == y0 and m.get("status") in ("SCHEDULED", "TIMED"):
-                        cup_fixtures.append({"d": d.isoformat(), "time": m["utcDate"][11:16], "utc": True, "h": h, "a": a, "comp": CUP["code"],
-                                             "season": skey(y), "stage": m.get("stage", "")})
-            # official standings (point deductions included)
+                    last_fd = max(last_fd or d, d)
+                    em, ed = find(code, h, a, d) if sc and h and a else (None, None)
+                    if em and "hg" in em:
+                        checked += 1
+                        if (em["hg"], em["ag"]) != tuple(sc):
+                            conflicts.append({"d": ed.isoformat(), "h": h, "a": a, "comp": code,
+                                              "scores": {"ESPN": f"{em['hg']}-{em['ag']}", "football-data.org": f"{sc[0]}-{sc[1]}"}})
             for code, L in LEAGUES.items():
                 try:
                     j, meta = cached(f"fd_st_{L['fd']}", lambda: fd.get(f"/competitions/{L['fd']}/standings"), 0.5)
@@ -575,23 +500,22 @@ def main():
                     continue
                 rows = []
                 for t in tot["table"]:
-                    nm = fd_names.get(t["team"]["name"], canon_by_comp[code], 0.75) or clean(t["team"]["name"])
+                    nm = fd_names.get(t["team"]["name"], teams_by.get(code), 0.75) or clean(t["team"]["name"])
                     rows.append({"pos": t["position"], "team": nm, "p": t["playedGames"], "w": t["won"], "d": t["draw"], "l": t["lost"],
                                  "gf": t["goalsFor"], "ga": t["goalsAgainst"], "gd": t["goalDifference"], "pts": t["points"],
                                  "form": t.get("form")})
                 standings[code] = {"updated": iso(datetime.fromtimestamp(meta["t"], timezone.utc)), "table": rows}
-            st.update(calls=fd.calls, lastMatch=last_fd and last_fd.isoformat(), extra=len(extra), cupFixtures=len(cup_fixtures))
+            st.update(calls=fd.calls, lastMatch=last_fd and last_fd.isoformat(), checked=checked, tables=len(standings))
         except Exception as e:
             st.update(ok=False, error=str(e)[:200])
         sources["football-data.org"] = st
-        log(f"  {fd.calls} calls, {len(extra)} extra results, {len(cup_fixtures)} UCL fixtures, errors {len(st['errors'])}")
+        log(f"  {fd.calls} calls, {len(standings)} tables, {st.get('checked', 0)} results checked against ESPN, errors {len(st['errors'])}")
     else:
         sources["football-data.org"] = {"ok": False, "error": "no API key"}
 
-    # 3. Understat xG ------------------------------------------------------------------
+    # 3. Understat xG ------------------------------------------------------------------------------
     log("Understat ...")
     st = {"ok": True, "errors": [], "matches": 0}
-    us_names = NameMap()
     us_all = []
     for code, L in LEAGUES.items():
         if not L["us"]:
@@ -608,67 +532,68 @@ def main():
                 st["errors"].append(f"{L['us']} {y}: {str(e)[:80]}")
                 continue
             for m in j.get("dates", []):
-                if not m.get("isResult"):
-                    continue
-                us_all.append((code, skey(y), datetime.fromisoformat(m["datetime"]).date(), m["h"]["title"], m["a"]["title"],
-                               int(m["goals"]["h"]), int(m["goals"]["a"]), float(m["xG"]["h"]), float(m["xG"]["a"])))
+                if m.get("isResult"):
+                    us_all.append((code, datetime.fromisoformat(m["datetime"]).date(), m["h"]["title"], m["a"]["title"],
+                                   int(m["goals"]["h"]), int(m["goals"]["a"]), float(m["xG"]["h"]), float(m["xG"]["a"])))
+    last_us, unmapped = None, 0
     for code in LEAGUES:
-        us_names.learn([(d, h, a) for c, s, d, h, a, *_ in us_all if c == code], of_rows[code])
-    last_us = None
-    for code, season, d, hn, an, hg, ag, xh, xa in us_all:
-        h, a = us_names.get(hn, canon_by_comp[code]), us_names.get(an, canon_by_comp[code])
-        if not h or not a:
-            continue
-        r = find_of(season, code, h, a)
-        dd = r["d"] if r else d
-        xg[f"{dd.isoformat()}|{h}|{a}"] = [round(xh, 3), round(xa, 3)]
-        last_us = max(last_us or d, d)
-        if r and (r["hg"], r["ag"]) != (hg, ag):
-            conflicts.append({"d": dd.isoformat(), "h": h, "a": a, "comp": code,
-                              "scores": {"openfootball": f"{r['hg']}-{r['ag']}", "Understat": f"{hg}-{ag}"}})
-    st.update(matches=len(xg), lastMatch=last_us and last_us.isoformat(), unmapped=len(us_all) - len(xg))
+        nm = NameMap()
+        nm.learn([(d, h, a) for c, d, h, a, *_ in us_all if c == code], rows_by[code])
+        for c, d, hn, an, hg, ag, xh, xa in us_all:
+            if c != code:
+                continue
+            h, a = nm.get(hn, teams_by.get(code)), nm.get(an, teams_by.get(code))
+            em, ed = find(code, h, a, d) if h and a else (None, None)
+            if not em:
+                unmapped += 1
+                continue
+            xg[f"{ed.isoformat()}|{h}|{a}"] = [round(xh, 3), round(xa, 3)]
+            last_us = max(last_us or d, d)
+            if "hg" in em and (em["hg"], em["ag"]) != (hg, ag):
+                conflicts.append({"d": ed.isoformat(), "h": h, "a": a, "comp": code,
+                                  "scores": {"ESPN": f"{em['hg']}-{em['ag']}", "Understat": f"{hg}-{ag}"}})
+    st.update(matches=len(xg), lastMatch=last_us and last_us.isoformat(), unmapped=unmapped)
     sources["Understat"] = st
-    log(f"  xG for {len(xg)} matches, last {st['lastMatch']}")
+    log(f"  xG for {len(xg)} matches, last {st['lastMatch']}, {unmapped} not matched")
 
-    # 4. OpenLigaDB (Bundesliga cross-check) -------------------------------------------
+    # 4. OpenLigaDB (Bundesliga cross-check) -------------------------------------------------------
     log("OpenLigaDB ...")
     st = {"ok": True}
     try:
         j, meta = cached(f"oldb_bl1_{y0}", lambda: json.loads(http(f"https://api.openligadb.de/getmatchdata/bl1/{y0}")[0]), 0.5)
-        ol_names = NameMap()
         rows = []
         for m in j:
-            if not m.get("matchIsFinished"):
-                continue
-            res = next((x for x in m.get("matchResults", []) if x.get("resultTypeID") == 2), None)
+            res = next((x for x in m.get("matchResults", []) if x.get("resultTypeID") == 2), None) if m.get("matchIsFinished") else None
             if res:
                 rows.append((datetime.fromisoformat(m["matchDateTimeUTC"].replace("Z", "+00:00")).date(),
                              m["team1"]["teamName"], m["team2"]["teamName"], res["pointsTeam1"], res["pointsTeam2"]))
-        ol_names.learn([(d, h, a) for d, h, a, *_ in rows], of_rows["de.1"])
+        ol = NameMap()
+        ol.learn([(d, h, a) for d, h, a, *_ in rows], rows_by["de.1"])
         last_ol = None
         for d, hn, an, hg, ag in rows:
-            h, a = ol_names.get(hn, canon_by_comp["de.1"]), ol_names.get(an, canon_by_comp["de.1"])
+            h, a = ol.get(hn, teams_by.get("de.1")), ol.get(an, teams_by.get("de.1"))
             last_ol = max(last_ol or d, d)
-            r = find_of(skey(y0), "de.1", h, a) if h and a else None
-            if r and (r["hg"], r["ag"]) != (hg, ag):
-                conflicts.append({"d": r["d"].isoformat(), "h": h, "a": a, "comp": "de.1",
-                                  "scores": {"openfootball": f"{r['hg']}-{r['ag']}", "OpenLigaDB": f"{hg}-{ag}"}})
+            em, ed = find("de.1", h, a, d) if h and a else (None, None)
+            if em and "hg" in em and (em["hg"], em["ag"]) != (hg, ag):
+                conflicts.append({"d": ed.isoformat(), "h": h, "a": a, "comp": "de.1",
+                                  "scores": {"ESPN": f"{em['hg']}-{em['ag']}", "OpenLigaDB": f"{hg}-{ag}"}})
         st.update(matches=len(rows), lastMatch=last_ol and last_ol.isoformat())
     except Exception as e:
         st.update(ok=False, error=str(e)[:200])
     sources["OpenLigaDB"] = st
 
-    # 5. The Odds API -------------------------------------------------------------------
+    # 5. The Odds API ------------------------------------------------------------------------------
     log("The Odds API ...")
     odds = []
     st = {"ok": True}
+    odds_keys = [(code, L["odds"]) for code, L in LEAGUES.items()] + list(CUP_ODDS.items())
     if cfg["odds_api_key"]:
         meta_p = cache_path("odds_meta")
         ometa = json.load(open(meta_p, encoding="utf-8"))["data"] if os.path.exists(meta_p) else {}
         prev_odds = (prev.get("sources") or {}).get("The Odds API") or {}
         if not ometa and prev_odds.get("fetchedAt"):
             # no cache (a fresh GitHub Actions runner that lost its cache): the last snapshot says when the
-            # odds were refreshed - without this every run would spend 9 credits
+            # odds were refreshed - without this every run would spend the credits again
             t = datetime.strptime(prev_odds["fetchedAt"], "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc).timestamp()
             ometa = {"t": t, "remaining": prev_odds.get("remaining")}
         remaining = ometa.get("remaining")
@@ -680,10 +605,15 @@ def main():
         raw_events = {}
         if not fresh_enough and (remaining is None or int(remaining) > cfg["odds_min_remaining"]):
             try:
-                for code, L in list(LEAGUES.items()) + [(CUP["code"], CUP)]:
-                    url = (f"https://api.the-odds-api.com/v4/sports/{L['odds']}/odds?regions={cfg['odds_regions']}"
+                for code, key in odds_keys:
+                    url = (f"https://api.the-odds-api.com/v4/sports/{key}/odds?regions={cfg['odds_regions']}"
                            f"&markets=h2h&oddsFormat=decimal&apiKey={cfg['odds_api_key']}")
-                    raw, hdr = http(url)
+                    try:
+                        raw, hdr = http(url)
+                    except urllib.error.HTTPError as e:
+                        if e.code == 404:            # a competition out of season
+                            continue
+                        raise
                     raw_events[code] = json.loads(raw)
                     remaining = hdr.get("x-requests-remaining", remaining)
                 ometa = {"t": time.time(), "remaining": remaining}
@@ -694,14 +624,12 @@ def main():
                 st.update(error=str(e)[:200].replace(cfg["odds_api_key"], "***"))
         if not raw_events and os.path.exists(cache_path("odds_events")):
             raw_events = json.load(open(cache_path("odds_events"), encoding="utf-8"))["data"]
-        # align bookmaker names with openfootball fixtures (UCL: with the football-data.org fixtures)
-        ucl_rows = [(date.fromisoformat(f["d"]), f["h"], f["a"]) for f in cup_fixtures]
+        today = date.today()
         for code, events in raw_events.items():
+            fx = [(d, h, a) for d, h, a in rows_by.get(code, []) if d >= today - timedelta(days=1)]
             nm = NameMap()
-            canon = ucl_rows if code == CUP["code"] else of_fix_rows[code]
-            ev_rows = [(utc_day(e["commence_time"]), e["home_team"], e["away_team"]) for e in events]
-            nm.learn(ev_rows, canon)
-            pool = all_canon if code == CUP["code"] else canon_by_comp[code]
+            nm.learn([(utc_day(e["commence_time"]), e["home_team"], e["away_team"]) for e in events], fx)
+            pool = teams_by.get(code) or all_teams
             for e in events:
                 h, a = nm.get(e["home_team"], pool), nm.get(e["away_team"], pool)
                 if not h or not a:
@@ -722,9 +650,8 @@ def main():
                 if not probs:
                     continue
                 n = len(probs)
-                fx_day = utc_day(e["commence_time"])
-                ofx = next((f for f in of_fix if f["comp"] == code and f["h"] == h and f["a"] == a and abs((f["d"] - fx_day).days) <= 1), None)
-                odds.append({"d": (ofx["d"] if ofx else fx_day).isoformat(), "h": h, "a": a, "comp": code, "n": n,
+                em, ed = find(code, h, a, utc_day(e["commence_time"]), 1)
+                odds.append({"d": (ed or utc_day(e["commence_time"])).isoformat(), "h": h, "a": a, "comp": code, "n": n,
                              "p": [round(sum(p[k] for p in probs) / n, 4) for k in range(3)],
                              "best": [max(p[k] for p in prices) for k in range(3)],
                              "avg": [round(sum(p[k] for p in prices) / n, 3) for k in range(3)],
@@ -740,26 +667,26 @@ def main():
     sources["The Odds API"] = st
     log(f"  {len(odds)} matches with odds, credits left {st.get('remaining')}")
 
-    # 6. Elo ratings where the page's three seasons begin --------------------------------
+    # 6. Elo ratings where the page's three seasons begin ------------------------------------------
     log("Elo start ratings ...")
     elo = None
     try:
-        elo = elo_start(y0, fd)
-        log(f"  {len(elo['ratings'])} teams rated from {elo['matches']} matches before {elo['start']}, "
-            f"{len(elo['alias'])} club names unified")
+        elo = elo_start(y0, ms, label)
+        log(f"  {len(elo['ratings'])} teams rated from {elo['matches']} matches before {elo['start']}")
     except Exception as e:
         log(f"  Elo failed: {str(e)[:160]}")
-        if (prev.get("elo") or {}).get("start") == date(y0 - 2, 7, 1).isoformat():
+        if (prev.get("elo") or {}).get("start") == date(y0 - 2, 7, 1).isoformat() and (prev.get("elo") or {}).get("source") == "ESPN":
             elo = prev["elo"]
 
     # ---- assemble, keeping the previous section of any source that failed this time
-    snap.update(generated=iso(now_utc()), sources=sources, extra=extra, cupFixtures=cup_fixtures, xg=xg,
+    snap.update(generated=iso(now_utc()), sources=sources, matches=matches, extra=[], cupFixtures=[], xg=xg,
                 standings=standings, odds=odds, conflicts=conflicts, elo=elo)
-    for sect, src in (("standings", "football-data.org"), ("extra", "football-data.org"), ("cupFixtures", "football-data.org"),
-                      ("xg", "Understat"), ("odds", "The Odds API")):
-        if not snap[sect] and prev.get(sect):
+    for sect, src in (("standings", "football-data.org"), ("xg", "Understat"), ("odds", "The Odds API")):
+        if not snap[sect] and prev.get(sect) and prev.get("schema") == 2:
             snap[sect] = prev[sect]
             sources[src]["carriedOver"] = prev.get("generated")
+    if matches:
+        matches["generated"] = snap["generated"]
     snap["tookSeconds"] = round(time.time() - t_start, 1)
 
     js = json.dumps(snap, ensure_ascii=False, separators=(",", ":"), default=str)
@@ -771,11 +698,9 @@ def main():
     open(tmp, "w", encoding="utf-8").write("window.MATCHLAB_SNAPSHOT=" + js + ";\n")
     os.replace(tmp, os.path.join(OUT, "latest.js"))
     log(f"done in {snap['tookSeconds']} s -> data/latest.json ({len(js) / 1024:.0f} KB), "
-        f"{len(extra)} extra results, {len(xg)} xG, {len(odds)} odds, {len(conflicts)} score conflicts")
+        f"{len(matches['rows']) if matches else 0} matches, {len(xg)} xG, {len(odds)} odds, {len(conflicts)} score conflicts")
     for c in conflicts[:10]:
         log("  conflict:", c)
-    for e in [e for e in extra if not e["cup"]][:10]:
-        log("  league result not (yet) in openfootball:", e)
 
 
 if __name__ == "__main__":

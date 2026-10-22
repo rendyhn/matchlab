@@ -632,7 +632,7 @@ en: {
   noMatch: 'No team matches. Try another spelling, for example without accents.',
   ldFetch: 'Fetching the latest results…', ldFetchN: 'Fetching the latest results… {d}/{n} files', ldTrain: 'Training the model on {n} matches…',
   errTitle: 'Match data could not be fetched',
-  errBody: 'This page fetches the latest results from GitHub (openfootball) every time it opens. Check your internet connection and try again. If the page is opened from a file on your computer and still fails, open it in an up-to-date Chrome or Edge.',
+  errBody: 'This page loads the collector’s data (data/latest.js) and the latest results from ESPN every time it opens. Check your internet connection and try again. If the page is opened from a file on your computer, keep the data folder next to it and open it in an up-to-date Chrome or Edge.',
   retry: 'Try again', pickTwo: 'Pick two different teams.', pickBoth: 'Pick a home and an away team.',
   favHome: 'favoured to win at home', favNeutral: 'favoured to win at a neutral venue', favAway: 'favoured to win away',
   draw: 'Draw', drawSym: 'X', drawLikely: 'the most likely result',
@@ -668,11 +668,11 @@ en: {
   calibCap: 'Dots on the dashed line mean honest numbers: when the model says 40%, it happens about 40% of the time. Vertical axis = how often the outcome actually happened; dot size = number of predictions.',
   methodTitle: 'How it works, and its limits',
   m1: '<b>Model.</b> Each team has two numbers: attacking and defensive strength. Each side’s goals in a match are treated as Poisson-distributed, with a mean built from those two numbers plus the home advantage of its league. The Dixon-Coles correction (ρ = {rho}) adjusts low scores such as 0–0 and 1–1, which happen more often than a plain Poisson guess.',
-  m2: '<b>Recent data weighs more.</b> A match’s weight halves every {hl} days, so last week’s form counts far more than last season’s. The model is retrained from scratch every time the page opens, on {n} matches from three seasons, including second divisions (history for promoted clubs) and {cups} Champions League matches.',
+  m2: '<b>Recent data weighs more.</b> A match’s weight halves every {hl} days, so last week’s form counts far more than last season’s. The model is retrained from scratch every time the page opens, on {n} matches from three seasons, including second divisions (history for promoted clubs) and {cups} matches from the three European cups.',
   m3: '<b>Across leagues.</b> Team strengths are pulled toward their league’s average. The gap between leagues can only be learned from cross-league matches: the Champions League and clubs moving up or down a division. That data is thin, so cross-league predictions are rougher than domestic ones.',
   m4: '<b>What the model does not know.</b> It reads final scores only. It knows nothing about injuries, suspensions, rotation, fixture congestion, coaching changes, weather or motivation. The fair odds here carry no bookmaker margin; bookmakers who read all of that are usually sharper. Treat these numbers as a starting point, not a certainty.',
   freshTitle: 'Data freshness, season {s}', thPlayed: 'Played', thScheduled: 'Scheduled', thLast: 'Latest result',
-  freshNote: 'The source is updated by openfootball volunteers, usually one to three days after a match.',
+  freshNote: 'Results come from ESPN, usually within minutes of the final whistle; the page adds this month’s results live every time it opens.',
   failedFiles: '{n} files could not be fetched on this load.',
   footData: 'Data: {link}, fetched live every time the page opens.', footNote: 'A statistical model, not a guaranteed result.',
   stLive3: 'Data to <b>{date}</b> · {n} matches · {src} sources · trained in {ms} ms', grpUcl: 'Champions League (other clubs)',
@@ -689,8 +689,8 @@ en: {
   srcTitle: 'Data sources', thSource: 'Source', thStatus: 'Status', thFresh: 'Latest data', thNote: 'Note',
   stOk: 'OK', stErr: 'Failed', stOff: 'Not used', stOld: 'Old copy',
   srcNoSnap: 'No extra data yet. Run update-data.bat in the app folder to add football-data.org, Understat, OpenLigaDB and bookmaker odds.',
-  srcAge: 'Extra data built {ago}.', srcBase: 'Main source · {n} matches',
-  srcFd: '{n} extra results incl. Champions League, {f} upcoming Champions League matches, official tables',
+  srcAge: 'Extra data built {ago}.', srcBase: 'Main source · {n} matches, {l} added live',
+  srcFd: 'Official tables for {t} leagues; {n} results checked against ESPN',
   srcXg: 'xG for {n} matches (top-5 leagues)', srcOl: 'Bundesliga cross-check · {n} matches',
   srcOdds: '{n} matches · {r} credits left · refreshed every {h} h',
   confNone: 'Scores agree across all sources.', confSome: '{n} scores differ between sources:', snapStale: 'Extra data last built {ago}',
@@ -733,15 +733,15 @@ en: {
   thResult: 'Result',
   thLL: 'Log-loss',
   m6: '<b>Two models, blended.</b> Next to Dixon-Coles runs an Elo rating: every result moves the two clubs’ ratings, more after a big win, and an ordered logit fitted on the last two years turns a rating gap into 1/X/2. The two read the data differently, so their blend forecasts better than either: {elo} Elo, {dc} Dixon-Coles.',
-  m7: '<b>How the settings were chosen.</b> In model-lab, every setting and every candidate change was tried on 2022/23–2023/24, week by week with only earlier data, then tested untouched on 2024/25–2026/27. Only the Elo blend passed: log-loss −0.0020 (±0.0012) on the test seasons. A separate xG model, a recalibration layer and re-tuned settings did not beat noise and were left out.',
-  m8: '<b>One club, one history.</b> openfootball sometimes spells a club differently from one season or division to the next (“VfL Bochum 1848” / “VfL Bochum”). Such names are joined when they come from the same country, one contains the other and they never play in the same season: {n} this time.',
+  m7: '<b>How the settings were chosen.</b> In model-lab, every setting and every candidate change was tried on 2022/23–2023/24, week by week with only earlier data, then tested untouched on 2024/25–2026/27. Only the Elo blend passed: log-loss −0.0020 (±0.0012) on the test seasons. A separate xG model, a recalibration layer and re-tuned settings did not beat noise and were left out. v7 (ESPN data) went through the same test: fitting on every competition plus shot-based expected goals gained −0.0008 (±0.0010) after the Elo blend, better in all five seasons but at the edge of the noise.',
+  m8: '<b>One club, one history.</b> ESPN gives every club one id across seasons, divisions and cups, so a promoted club keeps its history. <b>Shots where there is no xG.</b> Outside the top five leagues Understat has no xG; there, expected goals from shots on target make up {w} of the fitting target: {n} matches this time.',
   verStamp: 'Engine {v} · settings {c} · data {d}',
   healthTitle: 'Data health',
   hXg: 'xG coverage, top-5 leagues this season: {p}',
   hOdds: 'Bookmaker odds for league matches in the next 7 days: {p}',
   hElo: 'Elo history: carried from {n} matches since {s}',
   hEloNone: 'Elo history: not in the snapshot yet — Elo starts from scratch on three seasons, a weaker blend.',
-  hNames: 'Club names joined across seasons: {n}',
+  hNames: 'Shot-based expected goals (no Understat xG): {n} matches',
   navAria: 'Sections',
   navPred: 'Prediction',
   navTable: 'Table',
@@ -796,7 +796,7 @@ es: {
   noMatch: 'Ningún equipo coincide. Prueba otra grafía, por ejemplo sin acentos.',
   ldFetch: 'Descargando los últimos resultados…', ldFetchN: 'Descargando los últimos resultados… {d}/{n} archivos', ldTrain: 'Entrenando el modelo con {n} partidos…',
   errTitle: 'No se pudieron obtener los datos',
-  errBody: 'Esta página descarga los últimos resultados de GitHub (openfootball) cada vez que se abre. Revisa tu conexión a internet y vuelve a intentarlo. Si abres la página desde un archivo de tu ordenador y sigue fallando, ábrela con Chrome o Edge actualizados.',
+  errBody: 'Esta página carga los datos del recolector (data/latest.js) y los últimos resultados de ESPN cada vez que se abre. Revisa tu conexión a internet y vuelve a intentarlo. Si abres la página desde un archivo de tu ordenador, deja la carpeta data junto a ella y ábrela con Chrome o Edge actualizados.',
   retry: 'Reintentar', pickTwo: 'Elige dos equipos distintos.', pickBoth: 'Elige un equipo local y uno visitante.',
   favHome: 'favorito para ganar en casa', favNeutral: 'favorito para ganar en campo neutral', favAway: 'favorito para ganar a domicilio',
   draw: 'Empate', drawSym: 'X', drawLikely: 'el resultado más probable',
@@ -832,11 +832,11 @@ es: {
   calibCap: 'Los puntos sobre la línea discontinua significan cifras honestas: si el modelo dice 40 %, ocurre cerca del 40 % de las veces. Eje vertical = con qué frecuencia ocurrió de verdad; tamaño del punto = número de predicciones.',
   methodTitle: 'Cómo funciona y sus límites',
   m1: '<b>Modelo.</b> Cada equipo tiene dos números: fuerza atacante y defensiva. Los goles de cada equipo en un partido siguen una distribución de Poisson, con una media construida a partir de esos dos números más la ventaja de local de su liga. La corrección de Dixon-Coles (ρ = {rho}) ajusta los marcadores bajos como 0–0 y 1–1, más frecuentes de lo que predice un Poisson simple.',
-  m2: '<b>Los datos recientes pesan más.</b> El peso de un partido se reduce a la mitad cada {hl} días, así que la forma de la semana pasada cuenta mucho más que la de la temporada pasada. El modelo se reentrena desde cero cada vez que se abre la página, con {n} partidos de tres temporadas, incluidas las segundas divisiones (historial de los ascendidos) y {cups} partidos de la Liga de Campeones.',
+  m2: '<b>Los datos recientes pesan más.</b> El peso de un partido se reduce a la mitad cada {hl} días, así que la forma de la semana pasada cuenta mucho más que la de la temporada pasada. El modelo se reentrena desde cero cada vez que se abre la página, con {n} partidos de tres temporadas, incluidas las segundas divisiones (historial de los ascendidos) y {cups} partidos de las tres copas europeas.',
   m3: '<b>Entre ligas.</b> La fuerza de cada equipo se acerca a la media de su liga. La diferencia de nivel entre ligas solo se aprende de partidos entre ligas: la Liga de Campeones y los clubes que suben o bajan de categoría. Son pocos datos, así que las predicciones entre ligas son menos precisas que las de liga.',
   m4: '<b>Lo que el modelo no sabe.</b> Solo lee marcadores finales. No sabe nada de lesiones, sanciones, rotaciones, calendario apretado, cambios de entrenador, clima ni motivación. Las cuotas justas no incluyen el margen de la casa; las casas de apuestas, que leen todo eso, suelen afinar más. Usa estas cifras como punto de partida, no como certeza.',
   freshTitle: 'Actualidad de los datos, temporada {s}', thPlayed: 'Jugados', thScheduled: 'Programados', thLast: 'Último resultado',
-  freshNote: 'Voluntarios de openfootball actualizan la fuente, normalmente de uno a tres días después de cada partido.',
+  freshNote: 'Los resultados vienen de ESPN, normalmente minutos después del pitido final; la página añade en vivo los resultados de este mes cada vez que se abre.',
   failedFiles: 'No se pudieron descargar {n} archivos en esta carga.',
   footData: 'Datos: {link}, descargados en vivo cada vez que se abre la página.', footNote: 'Un modelo estadístico, no un resultado garantizado.',
   stLive3: 'Datos hasta el <b>{date}</b> · {n} partidos · {src} fuentes · entrenado en {ms} ms', grpUcl: 'Liga de Campeones (otros clubes)',
@@ -853,8 +853,8 @@ es: {
   srcTitle: 'Fuentes de datos', thSource: 'Fuente', thStatus: 'Estado', thFresh: 'Dato más reciente', thNote: 'Nota',
   stOk: 'OK', stErr: 'Error', stOff: 'Sin usar', stOld: 'Copia antigua',
   srcNoSnap: 'Aún no hay datos adicionales. Ejecuta update-data.bat en la carpeta de la aplicación para añadir football-data.org, Understat, OpenLigaDB y las cuotas.',
-  srcAge: 'Datos adicionales generados {ago}.', srcBase: 'Fuente principal · {n} partidos',
-  srcFd: '{n} resultados adicionales, incl. Liga de Campeones; {f} partidos de Liga de Campeones programados; clasificaciones oficiales',
+  srcAge: 'Datos adicionales generados {ago}.', srcBase: 'Fuente principal · {n} partidos, {l} añadidos en vivo',
+  srcFd: 'Clasificaciones oficiales de {t} ligas; {n} resultados cotejados con ESPN',
   srcXg: 'xG de {n} partidos (5 grandes ligas)', srcOl: 'Contraste de la Bundesliga · {n} partidos',
   srcOdds: '{n} partidos · quedan {r} créditos · se actualiza cada {h} h',
   confNone: 'Los marcadores coinciden en todas las fuentes.', confSome: '{n} marcadores difieren entre fuentes:', snapStale: 'Datos adicionales generados {ago}',
@@ -897,15 +897,15 @@ es: {
   thResult: 'Resultado',
   thLL: 'Log-loss',
   m6: '<b>Dos modelos, mezclados.</b> Junto a Dixon-Coles funciona una valoración Elo: cada resultado mueve las valoraciones de los dos clubes, más tras una goleada, y un logit ordenado ajustado a los dos últimos años convierte la diferencia de valoración en 1/X/2. Los dos leen los datos de forma distinta, así que su mezcla pronostica mejor que cada uno por separado: {elo} Elo, {dc} Dixon-Coles.',
-  m7: '<b>Cómo se eligieron los ajustes.</b> En model-lab, cada ajuste y cada cambio candidato se probó en 2022/23–2023/24, semana a semana y solo con datos anteriores, y después se evaluó sin tocar en 2024/25–2026/27. Solo la mezcla con Elo lo superó: log-loss −0,0020 (±0,0012) en las temporadas de prueba. Un modelo de xG aparte, una capa de recalibración y ajustes reoptimizados no superaron el ruido y se descartaron.',
-  m8: '<b>Un club, una historia.</b> openfootball a veces escribe un club de forma distinta según la temporada o la división («VfL Bochum 1848» / «VfL Bochum»). Esos nombres se unen cuando son del mismo país, uno contiene al otro y nunca juegan en la misma temporada: {n} esta vez.',
+  m7: '<b>Cómo se eligieron los ajustes.</b> En model-lab, cada ajuste y cada cambio candidato se probó en 2022/23–2023/24, semana a semana y solo con datos anteriores, y después se evaluó sin tocar en 2024/25–2026/27. Solo la mezcla con Elo lo superó: log-loss −0,0020 (±0,0012) en las temporadas de prueba. Un modelo de xG aparte, una capa de recalibración y ajustes reoptimizados no superaron el ruido y se descartaron. La v7 (datos de ESPN) pasó la misma prueba: ajustar con todas las competiciones y añadir goles esperados a partir de tiros ganó −0,0008 (±0,0010) tras la mezcla con Elo, mejor en las cinco temporadas pero al borde del ruido.',
+  m8: '<b>Un club, una historia.</b> ESPN da a cada club un mismo identificador en todas las temporadas, divisiones y copas, así que un ascendido conserva su historial. <b>Tiros donde no hay xG.</b> Fuera de las cinco grandes ligas Understat no tiene xG; allí, los goles esperados a partir de los tiros a puerta forman el {w} del objetivo del ajuste: {n} partidos esta vez.',
   verStamp: 'Motor {v} · ajustes {c} · datos {d}',
   healthTitle: 'Estado de los datos',
   hXg: 'Cobertura de xG, 5 grandes ligas esta temporada: {p}',
   hOdds: 'Cuotas para los partidos de liga de los próximos 7 días: {p}',
   hElo: 'Historial Elo: acumulado con {n} partidos desde {s}',
   hEloNone: 'Historial Elo: aún no está en la instantánea; Elo arranca de cero con tres temporadas y la mezcla es más débil.',
-  hNames: 'Nombres de clubes unidos entre temporadas: {n}',
+  hNames: 'Goles esperados a partir de tiros (sin xG de Understat): {n} partidos',
   navAria: 'Secciones',
   navPred: 'Predicción',
   navTable: 'Clasificación',
@@ -960,7 +960,7 @@ zh: {
   noMatch: '没有匹配的球队。请尝试其他拼写，例如去掉重音符号。',
   ldFetch: '正在获取最新赛果…', ldFetchN: '正在获取最新赛果… {d}/{n} 个文件', ldTrain: '正在用 {n} 场比赛训练模型…',
   errTitle: '无法获取比赛数据',
-  errBody: '本页面每次打开时都会从 GitHub（openfootball）获取最新赛果。请检查网络连接后重试。如果从电脑上的文件打开仍然失败，请使用最新版 Chrome 或 Edge 打开。',
+  errBody: '本页面每次打开时都会加载采集器数据（data/latest.js）并从 ESPN 获取最新赛果。请检查网络连接后重试。如果从电脑上的文件打开，请确保 data 文件夹与页面放在一起，并使用最新版 Chrome 或 Edge 打开。',
   retry: '重试', pickTwo: '请选择两支不同的球队。', pickBoth: '请选择主队和客队。',
   favHome: '主场获胜的热门', favNeutral: '中立场地获胜的热门', favAway: '客场获胜的热门',
   draw: '平局', drawSym: 'X', drawLikely: '最可能的结果',
@@ -996,11 +996,11 @@ zh: {
   calibCap: '点落在虚线上代表数字诚实：模型说 40%，实际也大约有 40% 的时候发生。纵轴 = 结果实际发生的频率；点的大小 = 预测数量。',
   methodTitle: '工作原理与局限',
   m1: '<b>模型。</b>每支球队有两个数值：进攻实力和防守实力。一场比赛中每队的进球数服从泊松分布，其均值由这两个数值加上所在联赛的主场优势决定。Dixon-Coles 修正（ρ = {rho}）调整 0–0、1–1 等低比分，这类比分比纯泊松模型预期的更常见。',
-  m2: '<b>近期数据权重更高。</b>一场比赛的权重每 {hl} 天减半，因此上周的状态远比上赛季重要。每次打开页面，模型都从零开始重新训练，使用三个赛季的 {n} 场比赛，包括次级联赛（升班马的历史）和 {cups} 场欧冠比赛。',
+  m2: '<b>近期数据权重更高。</b>一场比赛的权重每 {hl} 天减半，因此上周的状态远比上赛季重要。每次打开页面，模型都从零开始重新训练，使用三个赛季的 {n} 场比赛，包括次级联赛（升班马的历史）和 {cups} 场三项欧战比赛。',
   m3: '<b>跨联赛。</b>球队实力会向其联赛平均水平收缩。联赛之间的水平差距只能从跨联赛比赛中学习：欧冠以及升降级球队。这类数据很少，因此跨联赛预测比联赛内预测更粗略。',
   m4: '<b>模型不知道的事。</b>模型只读取最终比分，不了解伤病、停赛、轮换、密集赛程、换帅、天气或战意。这里的公平赔率不含抽水；掌握这些信息的博彩公司通常更准确。请把这些数字当作起点，而非定论。',
   freshTitle: '{s} 赛季数据新鲜度', thPlayed: '已赛', thScheduled: '待赛', thLast: '最近赛果',
-  freshNote: '数据源由 openfootball 志愿者更新，通常在比赛后一到三天内。',
+  freshNote: '赛果来自 ESPN，通常在终场哨响后几分钟内更新；每次打开页面时都会实时加入本月赛果。',
   failedFiles: '本次加载有 {n} 个文件获取失败。',
   footData: '数据：{link}，每次打开页面时实时获取。', footNote: '统计模型，不保证结果。',
   stLive3: '数据截至 <b>{date}</b> · {n} 场比赛 · {src} 个来源 · 训练用时 {ms} 毫秒', grpUcl: '欧冠（其他球队）',
@@ -1017,8 +1017,8 @@ zh: {
   srcTitle: '数据来源', thSource: '来源', thStatus: '状态', thFresh: '最新数据', thNote: '说明',
   stOk: '正常', stErr: '失败', stOff: '未使用', stOld: '旧副本',
   srcNoSnap: '尚无附加数据。在应用文件夹中运行 update-data.bat，即可加入 football-data.org、Understat、OpenLigaDB 和博彩赔率。',
-  srcAge: '附加数据生成于{ago}。', srcBase: '主要来源 · {n} 场比赛',
-  srcFd: '{n} 条附加赛果（含欧冠）、{f} 场已排期欧冠比赛、官方积分榜',
+  srcAge: '附加数据生成于{ago}。', srcBase: '主要来源 · {n} 场比赛，其中 {l} 场实时加入',
+  srcFd: '{t} 个联赛的官方积分榜；{n} 条赛果已与 ESPN 核对',
   srcXg: '{n} 场比赛的 xG（五大联赛）', srcOl: '德甲交叉核对 · {n} 场比赛',
   srcOdds: '{n} 场比赛 · 剩余额度 {r} · 每 {h} 小时更新',
   confNone: '所有来源的比分一致。', confSome: '{n} 个比分在不同来源之间不一致：', snapStale: '附加数据最后生成于{ago}',
@@ -1062,15 +1062,15 @@ zh: {
   thResult: '赛果',
   thLL: 'Log-loss',
   m6: '<b>两个模型，混合使用。</b>除 Dixon-Coles 外还运行一个 Elo 评分：每个赛果都会调整两队的评分，大胜调整得更多；再用基于最近两年拟合的有序 logit 把评分差转换为 1/X/2。两者解读数据的方式不同，因此混合后的预测优于任何一个：{elo} Elo，{dc} Dixon-Coles。',
-  m7: '<b>设置是如何选定的。</b>在 model-lab 中，每项设置和每个候选改动都先在 2022/23–2023/24 赛季逐周测试（只用之前的数据），然后在 2024/25–2026/27 赛季原封不动地检验。只有 Elo 混合通过：测试赛季 log-loss −0.0020（±0.0012）。独立的 xG 模型、再校准层和重新调优的设置都没有超出噪声，因此未采用。',
-  m8: '<b>一家俱乐部，一段历史。</b>openfootball 有时在不同赛季或级别中对同一俱乐部使用不同写法（“VfL Bochum 1848” / “VfL Bochum”）。如果两个名称来自同一国家、一个包含另一个，且从未在同一赛季出现，就会合并：本次合并了 {n} 个。',
+  m7: '<b>设置是如何选定的。</b>在 model-lab 中，每项设置和每个候选改动都先在 2022/23–2023/24 赛季逐周测试（只用之前的数据），然后在 2024/25–2026/27 赛季原封不动地检验。只有 Elo 混合通过：测试赛季 log-loss −0.0020（±0.0012）。独立的 xG 模型、再校准层和重新调优的设置都没有超出噪声，因此未采用。 v7（ESPN 数据）经过同样的检验：使用全部赛事拟合并加入基于射门的预期进球，在 Elo 混合后 log-loss 改善 −0.0008（±0.0010），五个赛季全部更好，但处于噪声边缘。',
+  m8: '<b>一家俱乐部，一段历史。</b>ESPN 为每家俱乐部在所有赛季、级别和杯赛中使用同一编号，升班马的历史不会中断。<b>没有 xG 时使用射门。</b>五大联赛以外 Understat 没有 xG；在这些比赛中，由射正次数估算的预期进球占拟合目标的 {w}：本次共 {n} 场。',
   verStamp: '引擎 {v} · 设置 {c} · 数据 {d}',
   healthTitle: '数据健康',
   hXg: '本赛季五大联赛 xG 覆盖率：{p}',
   hOdds: '未来 7 天联赛比赛的博彩赔率：{p}',
   hElo: 'Elo 历史：由 {s} 以来 {n} 场比赛累积',
   hEloNone: 'Elo 历史：快照中还没有——Elo 只能用三个赛季从零开始，混合效果较弱。',
-  hNames: '跨赛季合并的俱乐部名称：{n}',
+  hNames: '基于射门的预期进球（无 Understat xG）：{n} 场',
   navAria: '页面导航',
   navPred: '比赛预测',
   navTable: '积分榜',
@@ -1125,7 +1125,7 @@ fr: {
   noMatch: 'Aucune équipe ne correspond. Essayez une autre orthographe, par exemple sans accents.',
   ldFetch: 'Récupération des derniers résultats…', ldFetchN: 'Récupération des derniers résultats… {d}/{n} fichiers', ldTrain: 'Entraînement du modèle sur {n} matchs…',
   errTitle: 'Impossible de récupérer les données',
-  errBody: 'Cette page récupère les derniers résultats sur GitHub (openfootball) à chaque ouverture. Vérifiez votre connexion internet, puis réessayez. Si la page est ouverte depuis un fichier de votre ordinateur et échoue encore, ouvrez-la dans Chrome ou Edge à jour.',
+  errBody: 'Cette page charge les données du collecteur (data/latest.js) et les derniers résultats d’ESPN à chaque ouverture. Vérifiez votre connexion internet, puis réessayez. Si la page est ouverte depuis un fichier de votre ordinateur, gardez le dossier data à côté et ouvrez-la dans Chrome ou Edge à jour.',
   retry: 'Réessayer', pickTwo: 'Choisissez deux équipes différentes.', pickBoth: 'Choisissez une équipe à domicile et une à l’extérieur.',
   favHome: 'favori pour gagner à domicile', favNeutral: 'favori pour gagner sur terrain neutre', favAway: 'favori pour gagner à l’extérieur',
   draw: 'Nul', drawSym: 'N', drawLikely: 'le résultat le plus probable',
@@ -1161,11 +1161,11 @@ fr: {
   calibCap: 'Des points sur la ligne pointillée signifient des chiffres honnêtes : quand le modèle dit 40 %, cela arrive environ 40 % du temps. Axe vertical = fréquence réelle du résultat ; taille du point = nombre de prédictions.',
   methodTitle: 'Fonctionnement et limites',
   m1: '<b>Modèle.</b> Chaque équipe a deux nombres : force offensive et force défensive. Les buts de chaque équipe dans un match suivent une loi de Poisson dont la moyenne vient de ces deux nombres et de l’avantage du terrain de son championnat. La correction de Dixon-Coles (ρ = {rho}) ajuste les petits scores comme 0–0 et 1–1, plus fréquents que ne le prévoit un Poisson simple.',
-  m2: '<b>Les données récentes pèsent plus.</b> Le poids d’un match est divisé par deux tous les {hl} jours : la forme de la semaine dernière compte bien plus que celle de la saison dernière. Le modèle est réentraîné de zéro à chaque ouverture de la page, sur {n} matchs de trois saisons, dont les deuxièmes divisions (historique des promus) et {cups} matchs de Ligue des champions.',
+  m2: '<b>Les données récentes pèsent plus.</b> Le poids d’un match est divisé par deux tous les {hl} jours : la forme de la semaine dernière compte bien plus que celle de la saison dernière. Le modèle est réentraîné de zéro à chaque ouverture de la page, sur {n} matchs de trois saisons, dont les deuxièmes divisions (historique des promus) et {cups} matchs des trois coupes d’Europe.',
   m3: '<b>Entre championnats.</b> La force d’une équipe est tirée vers la moyenne de son championnat. L’écart de niveau entre championnats ne s’apprend qu’avec des matchs entre championnats : la Ligue des champions et les clubs qui montent ou descendent. Ces données sont rares, donc les prédictions entre championnats sont plus grossières.',
   m4: '<b>Ce que le modèle ignore.</b> Il ne lit que les scores finaux. Il ignore les blessures, suspensions, rotations, calendriers chargés, changements d’entraîneur, la météo et la motivation. Les cotes justes n’incluent aucune marge ; les bookmakers, qui tiennent compte de tout cela, sont en général plus précis. Prenez ces chiffres comme un point de départ, pas une certitude.',
   freshTitle: 'Fraîcheur des données, saison {s}', thPlayed: 'Joués', thScheduled: 'Programmés', thLast: 'Dernier résultat',
-  freshNote: 'La source est mise à jour par des bénévoles d’openfootball, en général un à trois jours après chaque match.',
+  freshNote: 'Les résultats viennent d’ESPN, en général quelques minutes après le coup de sifflet final ; la page ajoute en direct les résultats du mois à chaque ouverture.',
   failedFiles: '{n} fichiers n’ont pas pu être récupérés lors de ce chargement.',
   footData: 'Données : {link}, récupérées en direct à chaque ouverture de la page.', footNote: 'Un modèle statistique, pas un résultat garanti.',
   stLive3: 'Données jusqu’au <b>{date}</b> · {n} matchs · {src} sources · entraîné en {ms} ms', grpUcl: 'Ligue des champions (autres clubs)',
@@ -1182,8 +1182,8 @@ fr: {
   srcTitle: 'Sources de données', thSource: 'Source', thStatus: 'État', thFresh: 'Donnée la plus récente', thNote: 'Remarque',
   stOk: 'OK', stErr: 'Échec', stOff: 'Non utilisée', stOld: 'Ancienne copie',
   srcNoSnap: 'Pas encore de données supplémentaires. Lancez update-data.bat dans le dossier de l’application pour ajouter football-data.org, Understat, OpenLigaDB et les cotes.',
-  srcAge: 'Données supplémentaires générées {ago}.', srcBase: 'Source principale · {n} matchs',
-  srcFd: '{n} résultats supplémentaires dont la Ligue des champions, {f} matchs de Ligue des champions à venir, classements officiels',
+  srcAge: 'Données supplémentaires générées {ago}.', srcBase: 'Source principale · {n} matchs, dont {l} ajoutés en direct',
+  srcFd: 'Classements officiels de {t} championnats ; {n} résultats vérifiés avec ESPN',
   srcXg: 'xG de {n} matchs (5 grands championnats)', srcOl: 'Contrôle de la Bundesliga · {n} matchs',
   srcOdds: '{n} matchs · {r} crédits restants · actualisé toutes les {h} h',
   confNone: 'Les scores concordent entre toutes les sources.', confSome: '{n} scores diffèrent entre les sources :', snapStale: 'Données supplémentaires générées {ago}',
@@ -1226,15 +1226,15 @@ fr: {
   thResult: 'Résultat',
   thLL: 'Log-loss',
   m6: '<b>Deux modèles, mélangés.</b> À côté de Dixon-Coles tourne une note Elo : chaque résultat fait bouger les notes des deux clubs, davantage après une large victoire, et un logit ordonné ajusté sur les deux dernières années transforme l’écart de notes en 1/N/2. Les deux lisent les données différemment ; leur mélange prédit donc mieux que chacun seul : {elo} Elo, {dc} Dixon-Coles.',
-  m7: '<b>Comment les réglages ont été choisis.</b> Dans model-lab, chaque réglage et chaque changement envisagé a été essayé sur 2022/23–2023/24, semaine par semaine avec les seules données antérieures, puis testé sans retouche sur 2024/25–2026/27. Seul le mélange avec Elo a passé l’épreuve : log-loss −0,0020 (±0,0012) sur les saisons de test. Un modèle xG séparé, une couche de recalibration et des réglages ré-optimisés n’ont pas dépassé le bruit et ont été écartés.',
-  m8: '<b>Un club, une histoire.</b> openfootball écrit parfois un club différemment d’une saison ou d’une division à l’autre (« VfL Bochum 1848 » / « VfL Bochum »). Ces noms sont réunis quand ils viennent du même pays, que l’un contient l’autre et qu’ils ne jouent jamais la même saison : {n} cette fois.',
+  m7: '<b>Comment les réglages ont été choisis.</b> Dans model-lab, chaque réglage et chaque changement envisagé a été essayé sur 2022/23–2023/24, semaine par semaine avec les seules données antérieures, puis testé sans retouche sur 2024/25–2026/27. Seul le mélange avec Elo a passé l’épreuve : log-loss −0,0020 (±0,0012) sur les saisons de test. Un modèle xG séparé, une couche de recalibration et des réglages ré-optimisés n’ont pas dépassé le bruit et ont été écartés. La v7 (données ESPN) a passé le même test : l’ajustement sur toutes les compétitions et les buts attendus issus des tirs ont gagné −0,0008 (±0,0010) après le mélange avec Elo, mieux sur les cinq saisons mais à la limite du bruit.',
+  m8: '<b>Un club, une histoire.</b> ESPN donne à chaque club le même identifiant dans toutes les saisons, divisions et coupes : un promu garde son historique. <b>Les tirs là où il n’y a pas de xG.</b> Hors des cinq grands championnats, Understat n’a pas de xG ; les buts attendus calculés à partir des tirs cadrés y forment {w} de la cible de l’ajustement : {n} matchs cette fois.',
   verStamp: 'Moteur {v} · réglages {c} · données {d}',
   healthTitle: 'État des données',
   hXg: 'Couverture xG, 5 grands championnats cette saison : {p}',
   hOdds: 'Cotes pour les matchs de championnat des 7 prochains jours : {p}',
   hElo: 'Historique Elo : cumulé sur {n} matchs depuis {s}',
   hEloNone: 'Historique Elo : pas encore dans l’instantané — Elo repart de zéro sur trois saisons, mélange moins bon.',
-  hNames: 'Noms de clubs réunis entre saisons : {n}',
+  hNames: 'Buts attendus à partir des tirs (sans xG Understat) : {n} matchs',
   navAria: 'Sections',
   navPred: 'Prédiction',
   navTable: 'Classement',
@@ -1289,7 +1289,7 @@ de: {
   noMatch: 'Kein passendes Team. Andere Schreibweise versuchen, z. B. ohne Umlaute oder Akzente.',
   ldFetch: 'Neueste Ergebnisse werden geladen…', ldFetchN: 'Neueste Ergebnisse werden geladen… {d}/{n} Dateien', ldTrain: 'Modell wird mit {n} Spielen trainiert…',
   errTitle: 'Spieldaten konnten nicht geladen werden',
-  errBody: 'Diese Seite lädt bei jedem Öffnen die neuesten Ergebnisse von GitHub (openfootball). Prüfen Sie Ihre Internetverbindung und versuchen Sie es erneut. Wenn die Seite als Datei vom Computer geöffnet wird und weiterhin scheitert, öffnen Sie sie in einem aktuellen Chrome oder Edge.',
+  errBody: 'Diese Seite lädt bei jedem Öffnen die Daten des Collectors (data/latest.js) und die neuesten Ergebnisse von ESPN. Prüfen Sie Ihre Internetverbindung und versuchen Sie es erneut. Wenn die Seite als Datei vom Computer geöffnet wird, lassen Sie den Ordner data daneben liegen und öffnen Sie sie in einem aktuellen Chrome oder Edge.',
   retry: 'Erneut versuchen', pickTwo: 'Zwei verschiedene Teams wählen.', pickBoth: 'Heim- und Auswärtsteam wählen.',
   favHome: 'Favorit auf den Heimsieg', favNeutral: 'Favorit auf den Sieg auf neutralem Platz', favAway: 'Favorit auf den Auswärtssieg',
   draw: 'Remis', drawSym: 'X', drawLikely: 'das wahrscheinlichste Ergebnis',
@@ -1325,11 +1325,11 @@ de: {
   calibCap: 'Punkte auf der gestrichelten Linie bedeuten ehrliche Zahlen: Sagt das Modell 40 %, tritt es etwa in 40 % der Fälle ein. Senkrechte Achse = wie oft das Ergebnis tatsächlich eintrat; Punktgröße = Anzahl der Prognosen.',
   methodTitle: 'So funktioniert es – und seine Grenzen',
   m1: '<b>Modell.</b> Jedes Team hat zwei Zahlen: Angriffs- und Abwehrstärke. Die Tore jedes Teams in einem Spiel folgen einer Poisson-Verteilung, deren Mittelwert aus diesen beiden Zahlen und dem Heimvorteil seiner Liga entsteht. Die Dixon-Coles-Korrektur (ρ = {rho}) passt niedrige Ergebnisse wie 0:0 und 1:1 an, die häufiger vorkommen, als ein reines Poisson-Modell erwartet.',
-  m2: '<b>Neuere Daten zählen mehr.</b> Das Gewicht eines Spiels halbiert sich alle {hl} Tage, die Form der letzten Woche zählt also weit mehr als die der letzten Saison. Das Modell wird bei jedem Öffnen der Seite von Grund auf neu trainiert, mit {n} Spielen aus drei Saisons, einschließlich der zweiten Ligen (Vorgeschichte der Aufsteiger) und {cups} Champions-League-Spielen.',
+  m2: '<b>Neuere Daten zählen mehr.</b> Das Gewicht eines Spiels halbiert sich alle {hl} Tage, die Form der letzten Woche zählt also weit mehr als die der letzten Saison. Das Modell wird bei jedem Öffnen der Seite von Grund auf neu trainiert, mit {n} Spielen aus drei Saisons, einschließlich der zweiten Ligen (Vorgeschichte der Aufsteiger) und {cups} Spielen der drei Europapokale.',
   m3: '<b>Ligaübergreifend.</b> Die Teamstärken werden zum Durchschnitt ihrer Liga hingezogen. Den Niveauunterschied zwischen Ligen lernt das Modell nur aus ligaübergreifenden Spielen: der Champions League sowie Auf- und Absteigern. Diese Daten sind dünn, daher sind ligaübergreifende Prognosen gröber als nationale.',
   m4: '<b>Was das Modell nicht weiß.</b> Es liest nur Endergebnisse. Es weiß nichts von Verletzungen, Sperren, Rotation, engem Spielplan, Trainerwechseln, Wetter oder Motivation. Die fairen Quoten enthalten keine Marge; Buchmacher, die all das einbeziehen, liegen meist genauer. Nutzen Sie diese Zahlen als Ausgangspunkt, nicht als Gewissheit.',
   freshTitle: 'Aktualität der Daten, Saison {s}', thPlayed: 'Gespielt', thScheduled: 'Angesetzt', thLast: 'Letztes Ergebnis',
-  freshNote: 'Die Quelle wird von Freiwilligen bei openfootball gepflegt, meist ein bis drei Tage nach dem Spiel.',
+  freshNote: 'Die Ergebnisse kommen von ESPN, meist wenige Minuten nach Abpfiff; die Seite lädt die Ergebnisse des laufenden Monats bei jedem Öffnen live nach.',
   failedFiles: '{n} Dateien konnten bei diesem Laden nicht abgerufen werden.',
   footData: 'Daten: {link}, bei jedem Öffnen der Seite live abgerufen.', footNote: 'Ein statistisches Modell, kein garantiertes Ergebnis.',
   stLive3: 'Daten bis <b>{date}</b> · {n} Spiele · {src} Quellen · trainiert in {ms} ms', grpUcl: 'Champions League (weitere Klubs)',
@@ -1346,8 +1346,8 @@ de: {
   srcTitle: 'Datenquellen', thSource: 'Quelle', thStatus: 'Status', thFresh: 'Neueste Daten', thNote: 'Hinweis',
   stOk: 'OK', stErr: 'Fehler', stOff: 'Nicht genutzt', stOld: 'Alte Kopie',
   srcNoSnap: 'Noch keine Zusatzdaten. Starten Sie update-data.bat im Anwendungsordner, um football-data.org, Understat, OpenLigaDB und Buchmacherquoten hinzuzufügen.',
-  srcAge: 'Zusatzdaten erstellt {ago}.', srcBase: 'Hauptquelle · {n} Spiele',
-  srcFd: '{n} zusätzliche Ergebnisse inkl. Champions League, {f} angesetzte Champions-League-Spiele, offizielle Tabellen',
+  srcAge: 'Zusatzdaten erstellt {ago}.', srcBase: 'Hauptquelle · {n} Spiele, {l} live ergänzt',
+  srcFd: 'Offizielle Tabellen von {t} Ligen; {n} Ergebnisse mit ESPN abgeglichen',
   srcXg: 'xG für {n} Spiele (Top-5-Ligen)', srcOl: 'Bundesliga-Gegenprüfung · {n} Spiele',
   srcOdds: '{n} Spiele · {r} Credits übrig · Aktualisierung alle {h} Std.',
   confNone: 'Die Ergebnisse stimmen in allen Quellen überein.', confSome: '{n} Ergebnisse weichen zwischen den Quellen ab:', snapStale: 'Zusatzdaten zuletzt erstellt {ago}',
@@ -1390,15 +1390,15 @@ de: {
   thResult: 'Ergebnis',
   thLL: 'Log-Loss',
   m6: '<b>Zwei Modelle, gemischt.</b> Neben Dixon-Coles läuft eine Elo-Wertung: Jedes Ergebnis verschiebt die Wertungen beider Klubs, nach einem hohen Sieg stärker, und ein geordnetes Logit, angepasst an die letzten zwei Jahre, übersetzt den Wertungsabstand in 1/X/2. Beide lesen die Daten verschieden, darum sagt ihre Mischung besser vorher als jedes allein: {elo} Elo, {dc} Dixon-Coles.',
-  m7: '<b>Wie die Einstellungen gewählt wurden.</b> In model-lab wurde jede Einstellung und jede mögliche Änderung an 2022/23–2023/24 erprobt, Woche für Woche nur mit früheren Daten, und dann unverändert an 2024/25–2026/27 getestet. Nur die Elo-Mischung bestand: Log-Loss −0,0020 (±0,0012) in den Testsaisons. Ein eigenes xG-Modell, eine Nachkalibrierung und neu optimierte Einstellungen schlugen das Rauschen nicht und blieben draußen.',
-  m8: '<b>Ein Klub, eine Geschichte.</b> openfootball schreibt einen Klub manchmal je nach Saison oder Liga anders („VfL Bochum 1848“ / „VfL Bochum“). Solche Namen werden zusammengeführt, wenn sie aus demselben Land stammen, einer den anderen enthält und sie nie in derselben Saison spielen: diesmal {n}.',
+  m7: '<b>Wie die Einstellungen gewählt wurden.</b> In model-lab wurde jede Einstellung und jede mögliche Änderung an 2022/23–2023/24 erprobt, Woche für Woche nur mit früheren Daten, und dann unverändert an 2024/25–2026/27 getestet. Nur die Elo-Mischung bestand: Log-Loss −0,0020 (±0,0012) in den Testsaisons. Ein eigenes xG-Modell, eine Nachkalibrierung und neu optimierte Einstellungen schlugen das Rauschen nicht und blieben draußen. v7 (ESPN-Daten) durchlief denselben Test: die Anpassung an alle Wettbewerbe plus erwartete Tore aus Schüssen brachte nach der Elo-Mischung −0,0008 (±0,0010), besser in allen fünf Saisons, aber an der Grenze des Rauschens.',
+  m8: '<b>Ein Klub, eine Geschichte.</b> ESPN führt jeden Klub in allen Saisons, Ligen und Pokalen unter derselben ID, ein Aufsteiger behält also seine Geschichte. <b>Schüsse, wo es kein xG gibt.</b> Außerhalb der fünf großen Ligen hat Understat kein xG; dort machen erwartete Tore aus Schüssen aufs Tor {w} des Anpassungsziels aus: diesmal {n} Spiele.',
   verStamp: 'Engine {v} · Einstellungen {c} · Daten {d}',
   healthTitle: 'Datenlage',
   hXg: 'xG-Abdeckung, Top-5-Ligen diese Saison: {p}',
   hOdds: 'Buchmacherquoten für Ligaspiele der nächsten 7 Tage: {p}',
   hElo: 'Elo-Historie: fortgeschrieben aus {n} Spielen seit {s}',
   hEloNone: 'Elo-Historie: noch nicht im Snapshot – Elo beginnt mit drei Saisons bei null, die Mischung ist schwächer.',
-  hNames: 'Über Saisons zusammengeführte Klubnamen: {n}',
+  hNames: 'Erwartete Tore aus Schüssen (ohne Understat-xG): {n} Spiele',
   navAria: 'Abschnitte',
   navPred: 'Prognose',
   navTable: 'Tabelle',
@@ -1453,7 +1453,7 @@ ar: {
   noMatch: 'لا يوجد فريق مطابق. جرّب تهجئة أخرى.',
   ldFetch: 'جارٍ جلب أحدث النتائج…', ldFetchN: 'جارٍ جلب أحدث النتائج… {d}/{n} ملف', ldTrain: 'جارٍ تدريب النموذج على {n} مباراة…',
   errTitle: 'تعذّر جلب بيانات المباريات',
-  errBody: 'تجلب هذه الصفحة أحدث النتائج من GitHub (openfootball) في كل مرة تُفتح فيها. تحقّق من اتصالك بالإنترنت ثم أعد المحاولة. إذا فُتحت الصفحة من ملف على جهازك واستمر الفشل، فافتحها بأحدث إصدار من Chrome أو Edge.',
+  errBody: 'تحمّل هذه الصفحة بيانات المُجمِّع (data/latest.js) وأحدث النتائج من ESPN في كل مرة تُفتح فيها. تحقّق من اتصالك بالإنترنت ثم أعد المحاولة. إذا فُتحت الصفحة من ملف على جهازك، فأبقِ مجلد data بجانبها وافتحها بأحدث إصدار من Chrome أو Edge.',
   retry: 'إعادة المحاولة', pickTwo: 'اختر فريقين مختلفين.', pickBoth: 'اختر صاحب الأرض والضيف.',
   favHome: 'مرشّح للفوز على أرضه', favNeutral: 'مرشّح للفوز في ملعب محايد', favAway: 'مرشّح للفوز خارج أرضه',
   draw: 'تعادل', drawSym: 'X', drawLikely: 'النتيجة الأرجح',
@@ -1489,11 +1489,11 @@ ar: {
   calibCap: 'النقاط على الخط المتقطع تعني أرقاماً صادقة: إذا قال النموذج 40%، يحدث ذلك في نحو 40% من المرات. المحور العمودي = مدى تكرار النتيجة فعلاً؛ حجم النقطة = عدد التوقّعات.',
   methodTitle: 'طريقة العمل وحدودها',
   m1: '<b>النموذج.</b> لكل فريق رقمان: قوة الهجوم وقوة الدفاع. تُعامَل أهداف كل فريق في المباراة كتوزيع بواسون، متوسطه مبني على هذين الرقمين مع أفضلية الأرض في دوريه. يضبط تصحيح ديكسون-كولز (ρ = {rho}) النتائج المنخفضة مثل 0–0 و1–1، التي تتكرر أكثر مما يتوقعه بواسون البسيط.',
-  m2: '<b>البيانات الأحدث أثقل وزناً.</b> ينخفض وزن المباراة إلى النصف كل {hl} يوماً، فأداء الأسبوع الماضي أهم بكثير من أداء الموسم الماضي. يُعاد تدريب النموذج من الصفر في كل مرة تُفتح فيها الصفحة، على {n} مباراة من ثلاثة مواسم، تشمل الدرجة الثانية (تاريخ الأندية الصاعدة) و{cups} مباراة من دوري أبطال أوروبا.',
+  m2: '<b>البيانات الأحدث أثقل وزناً.</b> ينخفض وزن المباراة إلى النصف كل {hl} يوماً، فأداء الأسبوع الماضي أهم بكثير من أداء الموسم الماضي. يُعاد تدريب النموذج من الصفر في كل مرة تُفتح فيها الصفحة، على {n} مباراة من ثلاثة مواسم، تشمل الدرجة الثانية (تاريخ الأندية الصاعدة) و{cups} مباراة من البطولات الأوروبية الثلاث.',
   m3: '<b>بين الدوريات.</b> تُسحب قوة كل فريق نحو متوسط دوريه. لا يمكن تعلّم فارق المستوى بين الدوريات إلا من المباريات بينها: دوري أبطال أوروبا والأندية الصاعدة والهابطة. هذه البيانات قليلة، لذا توقعات ما بين الدوريات أقل دقة من توقعات الدوري الواحد.',
   m4: '<b>ما لا يعرفه النموذج.</b> يقرأ النتائج النهائية فقط، ولا يعرف شيئاً عن الإصابات والإيقافات والمداورة وضغط المباريات وتغيير المدربين والطقس والحافز. المعاملات العادلة هنا بلا هامش؛ وشركات المراهنات التي تأخذ كل ذلك في الحسبان عادةً أدق. تعامل مع هذه الأرقام كنقطة انطلاق لا كيقين.',
   freshTitle: 'حداثة البيانات، موسم {s}', thPlayed: 'لُعبت', thScheduled: 'مجدولة', thLast: 'آخر نتيجة',
-  freshNote: 'يحدّث متطوعو openfootball المصدر، عادةً بعد يوم إلى ثلاثة أيام من المباراة.',
+  freshNote: 'تأتي النتائج من ESPN، عادةً بعد دقائق من صافرة النهاية؛ وتضيف الصفحة نتائج هذا الشهر مباشرةً في كل مرة تُفتح فيها.',
   failedFiles: 'تعذّر جلب {n} ملف في هذا التحميل.',
   footData: 'البيانات: {link}، تُجلب مباشرة في كل مرة تُفتح فيها الصفحة.', footNote: 'نموذج إحصائي، وليس نتيجة مضمونة.',
   stLive3: 'البيانات حتى <b>{date}</b> · {n} مباراة · {src} مصادر · التدريب في {ms} مللي ثانية', grpUcl: 'دوري أبطال أوروبا (أندية أخرى)',
@@ -1510,8 +1510,8 @@ ar: {
   srcTitle: 'مصادر البيانات', thSource: 'المصدر', thStatus: 'الحالة', thFresh: 'أحدث بيانات', thNote: 'ملاحظة',
   stOk: 'يعمل', stErr: 'فشل', stOff: 'غير مستخدم', stOld: 'نسخة قديمة',
   srcNoSnap: 'لا توجد بيانات إضافية بعد. شغّل update-data.bat في مجلد التطبيق لإضافة football-data.org وUnderstat وOpenLigaDB ومعاملات المراهنات.',
-  srcAge: 'أُنشئت البيانات الإضافية {ago}.', srcBase: 'المصدر الرئيسي · {n} مباراة',
-  srcFd: '{n} نتيجة إضافية تشمل دوري أبطال أوروبا، و{f} مباراة مجدولة في دوري الأبطال، وجداول الترتيب الرسمية',
+  srcAge: 'أُنشئت البيانات الإضافية {ago}.', srcBase: 'المصدر الرئيسي · {n} مباراة، أُضيفت {l} مباشرةً',
+  srcFd: 'جداول رسمية لـ {t} دوريات؛ مطابقة {n} نتيجة مع ESPN',
   srcXg: 'xG لـ {n} مباراة (الدوريات الخمسة الكبرى)', srcOl: 'تحقق من الدوري الألماني · {n} مباراة',
   srcOdds: '{n} مباراة · الرصيد المتبقي {r} · تحديث كل {h} ساعة',
   confNone: 'النتائج متطابقة في جميع المصادر.', confSome: '{n} نتيجة تختلف بين المصادر:', snapStale: 'آخر إنشاء للبيانات الإضافية {ago}',
@@ -1555,15 +1555,15 @@ ar: {
   thResult: 'النتيجة',
   thLL: 'الخسارة اللوغاريتمية',
   m6: '<b>نموذجان ممزوجان.</b> إلى جانب ديكسون-كولز يعمل تقييم إيلو: كل نتيجة تحرّك تقييم الناديين، وأكثر بعد فوز كبير، ثم يحوّل نموذج لوجيت مرتب مُلاءَم على آخر عامين فارق التقييم إلى 1/X/2. يقرأ النموذجان البيانات بطريقتين مختلفتين، لذا يتنبأ مزيجهما أفضل من كل منهما منفردًا: {elo} إيلو و{dc} ديكسون-كولز.',
-  m7: '<b>كيف اختيرت الإعدادات.</b> في model-lab جُرّب كل إعداد وكل تغيير مقترح على 2022/23–2023/24 أسبوعًا بأسبوع وبالبيانات السابقة فقط، ثم اختُبر دون تعديل على 2024/25–2026/27. لم ينجح إلا مزج إيلو: الخسارة اللوغاريتمية −0.0020 (±0.0012) في مواسم الاختبار. أما نموذج xG المنفصل وطبقة إعادة المعايرة والإعدادات المُعاد ضبطها فلم تتجاوز الضجيج واستُبعدت.',
-  m8: '<b>نادٍ واحد، تاريخ واحد.</b> يكتب openfootball اسم النادي أحيانًا بشكل مختلف من موسم أو درجة إلى أخرى ("VfL Bochum 1848" / "VfL Bochum"). تُدمج هذه الأسماء إذا كانت من البلد نفسه واحتوى أحدها الآخر ولم تلعب قط في الموسم نفسه: {n} هذه المرة.',
+  m7: '<b>كيف اختيرت الإعدادات.</b> في model-lab جُرّب كل إعداد وكل تغيير مقترح على 2022/23–2023/24 أسبوعًا بأسبوع وبالبيانات السابقة فقط، ثم اختُبر دون تعديل على 2024/25–2026/27. لم ينجح إلا مزج إيلو: الخسارة اللوغاريتمية −0.0020 (±0.0012) في مواسم الاختبار. أما نموذج xG المنفصل وطبقة إعادة المعايرة والإعدادات المُعاد ضبطها فلم تتجاوز الضجيج واستُبعدت. خضع الإصدار v7 (بيانات ESPN) للاختبار نفسه: الملاءمة على كل المسابقات مع الأهداف المتوقعة من التسديدات حسّنت الخسارة اللوغاريتمية −0.0008 (±0.0010) بعد مزج إيلو، أفضل في المواسم الخمسة كلها لكن على حافة الضجيج.',
+  m8: '<b>نادٍ واحد، تاريخ واحد.</b> تمنح ESPN كل نادٍ رقمًا واحدًا في جميع المواسم والدرجات والكؤوس، فيحتفظ النادي الصاعد بتاريخه. <b>التسديدات حيث لا يوجد xG.</b> خارج الدوريات الخمسة الكبرى لا يوفّر Understat قيم xG؛ هناك تشكّل الأهداف المتوقعة المحسوبة من التسديدات على المرمى {w} من هدف الملاءمة: {n} مباراة هذه المرة.',
   verStamp: 'المحرّك {v} · الإعدادات {c} · البيانات {d}',
   healthTitle: 'حالة البيانات',
   hXg: 'تغطية xG في الدوريات الخمسة الكبرى هذا الموسم: {p}',
   hOdds: 'احتمالات المراهنات لمباريات الدوري في الأيام السبعة القادمة: {p}',
   hElo: 'تاريخ إيلو: متراكم من {n} مباراة منذ {s}',
   hEloNone: 'تاريخ إيلو: غير موجود في اللقطة بعد؛ يبدأ إيلو من الصفر على ثلاثة مواسم ويكون المزيج أضعف.',
-  hNames: 'أسماء أندية دُمجت عبر المواسم: {n}',
+  hNames: 'أهداف متوقعة من التسديدات (دون xG من Understat): {n} مباراة',
   navAria: 'الأقسام',
   navPred: 'التوقّع',
   navTable: 'الترتيب',
@@ -1618,7 +1618,7 @@ id: {
   noMatch: 'Tidak ada tim yang cocok. Coba ejaan lain, misalnya tanpa aksen.',
   ldFetch: 'Mengambil hasil pertandingan terbaru…', ldFetchN: 'Mengambil hasil pertandingan terbaru… {d}/{n} berkas', ldTrain: 'Melatih model pada {n} laga…',
   errTitle: 'Data pertandingan tidak bisa diambil',
-  errBody: 'Halaman ini mengambil hasil terbaru dari GitHub (openfootball) setiap kali dibuka. Periksa koneksi internet Anda, lalu coba lagi. Kalau halaman dibuka dari file di komputer dan tetap gagal, buka lewat Chrome atau Edge versi terbaru.',
+  errBody: 'Halaman ini memuat data kolektor (data/latest.js) dan hasil terbaru dari ESPN setiap kali dibuka. Periksa koneksi internet Anda, lalu coba lagi. Kalau halaman dibuka dari file di komputer, pastikan folder data ada di sebelahnya dan buka lewat Chrome atau Edge versi terbaru.',
   retry: 'Coba lagi', pickTwo: 'Pilih dua tim yang berbeda.', pickBoth: 'Pilih tuan rumah dan tamu.',
   favHome: 'diunggulkan menang di kandang', favNeutral: 'diunggulkan menang di tempat netral', favAway: 'diunggulkan menang sebagai tamu',
   draw: 'Seri', drawSym: 'X', drawLikely: 'hasil yang paling mungkin',
@@ -1654,11 +1654,11 @@ id: {
   calibCap: 'Titik di garis putus-putus berarti jujur: kalau model bilang 40%, kejadiannya memang sekitar 40%. Sumbu tegak = seberapa sering hasil itu benar-benar terjadi; besar titik = jumlah prediksi.',
   methodTitle: 'Cara kerja dan batasannya',
   m1: '<b>Model.</b> Setiap tim punya dua angka: kekuatan menyerang dan bertahan. Gol tiap tim dalam satu laga dianggap mengikuti distribusi Poisson dengan rata-rata dari kedua angka itu plus keuntungan kandang liganya. Koreksi Dixon-Coles (ρ = {rho}) menyesuaikan peluang skor rendah seperti 0–0 dan 1–1, yang lebih sering terjadi daripada tebakan Poisson murni.',
-  m2: '<b>Data terbaru lebih berat.</b> Bobot sebuah laga berkurang separuh setiap {hl} hari, jadi performa minggu lalu jauh lebih berpengaruh daripada musim lalu. Model dilatih ulang dari nol setiap halaman dibuka, pada {n} laga dari tiga musim, termasuk divisi dua (riwayat tim promosi) dan {cups} laga Liga Champions.',
+  m2: '<b>Data terbaru lebih berat.</b> Bobot sebuah laga berkurang separuh setiap {hl} hari, jadi performa minggu lalu jauh lebih berpengaruh daripada musim lalu. Model dilatih ulang dari nol setiap halaman dibuka, pada {n} laga dari tiga musim, termasuk divisi dua (riwayat tim promosi) dan {cups} laga dari tiga piala Eropa.',
   m3: '<b>Antar-liga.</b> Kekuatan tim ditarik ke rata-rata liganya. Selisih level antar-liga hanya bisa dipelajari dari laga lintas liga: Liga Champions dan klub yang naik atau turun divisi. Datanya sedikit, jadi prediksi antar-liga lebih kasar daripada laga domestik.',
   m4: '<b>Yang tidak diketahui model.</b> Model hanya membaca skor akhir. Ia tidak tahu cedera, skorsing, rotasi pemain, jadwal padat, pergantian pelatih, cuaca, atau motivasi. Odds wajar di sini tanpa margin bandar; bandar yang membaca semua informasi itu biasanya lebih tajam. Pakai angka ini sebagai titik awal, bukan kepastian.',
   freshTitle: 'Kesegaran data musim {s}', thPlayed: 'Dimainkan', thScheduled: 'Terjadwal', thLast: 'Hasil terakhir',
-  freshNote: 'Sumber diperbarui relawan openfootball, biasanya satu sampai tiga hari setelah laga.',
+  freshNote: 'Hasil laga diambil dari ESPN, biasanya beberapa menit setelah peluit akhir; halaman menambahkan hasil bulan ini secara langsung setiap kali dibuka.',
   failedFiles: '{n} berkas gagal diambil pada pemuatan ini.',
   footData: 'Data: {link}, diambil langsung setiap halaman dibuka.', footNote: 'Model statistik, bukan jaminan hasil.',
   stLive3: 'Data s.d. <b>{date}</b> · {n} laga · {src} sumber · dilatih {ms} ms', grpUcl: 'Liga Champions (klub lain)',
@@ -1675,8 +1675,8 @@ id: {
   srcTitle: 'Sumber data', thSource: 'Sumber', thStatus: 'Status', thFresh: 'Data terbaru', thNote: 'Keterangan',
   stOk: 'OK', stErr: 'Gagal', stOff: 'Tidak dipakai', stOld: 'Salinan lama',
   srcNoSnap: 'Data tambahan belum ada. Jalankan update-data.bat di folder aplikasi untuk menambahkan football-data.org, Understat, OpenLigaDB, dan odds bandar.',
-  srcAge: 'Data tambahan dibuat {ago}.', srcBase: 'Sumber utama · {n} laga',
-  srcFd: '{n} hasil tambahan termasuk Liga Champions, {f} laga Liga Champions terjadwal, klasemen resmi',
+  srcAge: 'Data tambahan dibuat {ago}.', srcBase: 'Sumber utama · {n} laga, {l} ditambahkan langsung',
+  srcFd: 'Klasemen resmi {t} liga; {n} hasil dicocokkan dengan ESPN',
   srcXg: 'xG untuk {n} laga (5 liga top)', srcOl: 'Pembanding Bundesliga · {n} laga',
   srcOdds: '{n} laga · sisa kuota {r} · diperbarui tiap {h} jam',
   confNone: 'Skor dari semua sumber cocok.', confSome: '{n} skor berbeda antar-sumber:', snapStale: 'Data tambahan terakhir dibuat {ago}',
@@ -1719,15 +1719,15 @@ id: {
   thResult: 'Hasil',
   thLL: 'Log-loss',
   m6: '<b>Dua model, dicampur.</b> Di samping Dixon-Coles berjalan rating Elo: setiap hasil menggeser rating kedua klub, lebih besar setelah menang telak, lalu logit berurutan yang dilatih pada dua tahun terakhir mengubah selisih rating menjadi 1/X/2. Keduanya membaca data dengan cara berbeda, sehingga campurannya memprediksi lebih baik daripada masing-masing: {elo} Elo, {dc} Dixon-Coles.',
-  m7: '<b>Cara setelan dipilih.</b> Di model-lab, setiap setelan dan setiap usulan perubahan dicoba di 2022/23–2023/24, minggu demi minggu hanya dengan data sebelumnya, lalu diuji tanpa diubah di 2024/25–2026/27. Hanya campuran Elo yang lolos: log-loss −0,0020 (±0,0012) di musim uji. Model xG terpisah, lapisan kalibrasi ulang dan setelan yang disetel ulang tidak melampaui derau sehingga tidak dipakai.',
-  m8: '<b>Satu klub, satu riwayat.</b> openfootball kadang menulis nama klub berbeda antar-musim atau antar-divisi ("VfL Bochum 1848" / "VfL Bochum"). Nama seperti itu digabung bila berasal dari negara yang sama, yang satu memuat yang lain, dan tidak pernah bermain di musim yang sama: {n} kali ini.',
+  m7: '<b>Cara setelan dipilih.</b> Di model-lab, setiap setelan dan setiap usulan perubahan dicoba di 2022/23–2023/24, minggu demi minggu hanya dengan data sebelumnya, lalu diuji tanpa diubah di 2024/25–2026/27. Hanya campuran Elo yang lolos: log-loss −0,0020 (±0,0012) di musim uji. Model xG terpisah, lapisan kalibrasi ulang dan setelan yang disetel ulang tidak melampaui derau sehingga tidak dipakai. v7 (data ESPN) menjalani uji yang sama: fitting pada semua kompetisi plus gol harapan dari tembakan memberi −0,0008 (±0,0010) setelah campuran Elo, lebih baik di kelima musim tetapi masih di tepi derau.',
+  m8: '<b>Satu klub, satu riwayat.</b> ESPN memberi tiap klub satu ID yang sama di semua musim, divisi, dan piala, jadi klub promosi tetap membawa riwayatnya. <b>Tembakan bila tidak ada xG.</b> Di luar lima liga top, Understat tidak punya xG; di sana gol harapan dari tembakan tepat sasaran mengisi {w} dari target fitting: {n} laga kali ini.',
   verStamp: 'Mesin {v} · setelan {c} · data {d}',
   healthTitle: 'Kesehatan data',
   hXg: 'Cakupan xG, 5 liga top musim ini: {p}',
   hOdds: 'Odds bandar untuk laga liga 7 hari ke depan: {p}',
   hElo: 'Riwayat Elo: terakumulasi dari {n} laga sejak {s}',
   hEloNone: 'Riwayat Elo: belum ada di snapshot — Elo mulai dari nol dengan tiga musim, campurannya lebih lemah.',
-  hNames: 'Nama klub yang digabung antar-musim: {n}',
+  hNames: 'Gol harapan dari tembakan (tanpa xG Understat): {n} laga',
   navAria: 'Bagian',
   navPred: 'Prediksi',
   navTable: 'Klasemen',
@@ -1826,7 +1826,7 @@ function applyStatic() {
   document.querySelectorAll('[data-i18n-title]').forEach(el => { el.title = tx(el.dataset.i18nTitle); });
   document.querySelectorAll('[data-i18n-aria]').forEach(el => { el.setAttribute('aria-label', tx(el.dataset.i18nAria)); });
   $('lang').setAttribute('aria-label', tx('langLabel'));
-  $('foot-data').innerHTML = th('footData', { link: { raw: '<a href="https://github.com/openfootball/football.json" target="_blank" rel="noopener">openfootball / football.json</a>' } });
+  $('foot-data').innerHTML = th('footData', { link: { raw: '<a href="https://www.espn.com/soccer/" target="_blank" rel="noopener">ESPN</a>, Understat, football-data.org' } });
 }
 
 function setLang(code, save) {
@@ -1856,9 +1856,19 @@ function setLang(code, save) {
    live in engine.js (shared with the backtest worker and collector/forecast.mjs). This script
    is the page: it only draws what the engine computes.
    ================================================================== */
-const DISPLAY_COMPS = LEAGUES.concat([{ code: UCL, short: 'UCL' }]);
-const leagueName = code => (code === UCL ? tx('ucl') : ((I18N[LANG].leagues && I18N[LANG].leagues[code]) || (LG[code] ? LG[code].name : code)));
-const lgShort = code => (code === UCL ? 'UCL' : (LG[code] ? LG[code].short : code));
+const DISPLAY_COMPS = LEAGUES.concat(CUP_LIST);
+// names of the competitions v7 adds, where a language does not use the English one
+const NAMES_V7 = {
+  es: { 'uefa.el': 'Liga Europa', 'uefa.ecl': 'Liga Conferencia', 'tr.1': 'Superliga de Turquía', 'sc.1': 'Premiership escocesa', 'at.1': 'Bundesliga austriaca', 'gr.1': 'Superliga de Grecia', 'dk.1': 'Superliga danesa', 'be.1': 'Pro League belga' },
+  zh: { 'uefa.el': '欧联', 'uefa.ecl': '欧协联', 'be.1': '比甲', 'tr.1': '土超', 'sc.1': '苏超', 'at.1': '奥甲', 'gr.1': '希腊超', 'dk.1': '丹超' },
+  fr: { 'uefa.el': 'Ligue Europa', 'uefa.ecl': 'Ligue Conférence', 'be.1': 'Pro League belge', 'tr.1': 'Süper Lig turque', 'sc.1': 'Premiership écossaise', 'at.1': 'Bundesliga autrichienne', 'gr.1': 'Super League grecque', 'dk.1': 'Superliga danoise' },
+  de: { 'be.1': 'Belgische Pro League', 'tr.1': 'Süper Lig', 'sc.1': 'Schottische Premiership', 'at.1': 'Österreichische Bundesliga', 'gr.1': 'Griechische Super League', 'dk.1': 'Dänische Superliga' },
+  ar: { 'uefa.el': 'الدوري الأوروبي', 'uefa.ecl': 'دوري المؤتمر الأوروبي', 'be.1': 'الدوري البلجيكي', 'tr.1': 'الدوري التركي', 'sc.1': 'الدوري الاسكتلندي', 'at.1': 'الدوري النمساوي', 'gr.1': 'الدوري اليوناني', 'dk.1': 'الدوري الدنماركي' },
+  id: { 'uefa.el': 'Liga Europa', 'uefa.ecl': 'Liga Konferensi', 'be.1': 'Liga Belgia', 'tr.1': 'Liga Turki', 'sc.1': 'Liga Skotlandia', 'at.1': 'Liga Austria', 'gr.1': 'Liga Yunani', 'dk.1': 'Liga Denmark' },
+};
+const leagueName = code => (code === UCL ? tx('ucl')
+  : ((I18N[LANG].leagues && I18N[LANG].leagues[code]) || (NAMES_V7[LANG] && NAMES_V7[LANG][code]) || (LG[code] ? LG[code].name : CUP[code] ? CUP[code].name : code)));
+const lgShort = code => (LG[code] ? LG[code].short : CUP[code] ? CUP[code].short : code);
 
 /* ==================================================================
    DATES (display)
@@ -1954,15 +1964,16 @@ async function boot() {
   $('loading').hidden = false;
   $('result').querySelectorAll(':scope > :not(#loading)').forEach(e => e.remove());
   setLoading('ldFetch');
+  // the snapshot holds the matches (v7), so it comes first; this month's results are then added live
+  const [snap, track] = await Promise.all([loadSnapshot(), loadTrack()]);
   let data;
   try {
     data = await loadData(url => fetch(url, { cache: 'no-cache' }).then(r => (r.ok ? r.json() : null)), (d, n) => {
       $('loading-bar').style.width = (100 * d / n) + '%';
       setLoading('ldFetchN', { d, n });
-    });
+    }, snap);
   } catch (e) { data = null; }
-  if (!data || !data.curFiles.length || !data.played.length) { showError(); return; }
-  const [snap, track] = await Promise.all([loadSnapshot(), loadTrack()]);
+  if (!data || !data.curComps.length || !data.played.length) { showError(); return; }
   mergeSnapshot(data, snap);
   S.data = data; S.track = track;
   setLoading('ldTrain', { n: fmtInt(data.played.length) });
@@ -2001,8 +2012,7 @@ async function boot() {
 
   S.lastDay = data.played.filter(r => !r.cup && r.season === data.cur).reduce((m, r) => Math.max(m, r.day), 0);
   buildTables();
-  // openfootball is always used (fetched live); the snapshot lists it as well, so it is not counted twice
-  const srcOk = 1 + (data.snap ? Object.entries(data.snap.sources || {}).filter(([k, s]) => k !== 'openfootball' && s && s.ok !== false).length : 0);
+  const srcOk = data.snap ? Object.values(data.snap.sources || {}).filter(s => s && s.ok !== false).length : 0;
   setStatus('live', 'stLive3', () => ({ date: fmtDay(S.lastDay, { day: 'numeric', month: 'short', year: 'numeric' }), n: fmtInt(data.played.length), src: srcOk, ms: fmtInt(S.fitMs) }));
 
   // a match link (?h=…&a=…) is read once, on the first load
@@ -2038,7 +2048,8 @@ function buildTables() {
     } else {
       const acc = new Map();
       for (const r of d.played) {
-        if (r.cup || r.comp !== l.code || r.season !== d.cur) continue;
+        // regular season only: split leagues (Belgium, Scotland, Austria, Greece, Denmark) then play a second stage
+        if (r.cup || r.comp !== l.code || r.season !== d.cur || r.round) continue;
         for (const [t, gf, ga] of [[r.h, r.hg, r.ag], [r.a, r.ag, r.hg]]) {
           if (!acc.has(t)) acc.set(t, { team: t, p: 0, w: 0, d: 0, l: 0, gf: 0, ga: 0 });
           const x = acc.get(t); x.p++; x.gf += gf; x.ga += ga;
@@ -2420,7 +2431,7 @@ function renderStandings() {
 function renderRanking() {
   filterChips($('rank-filter'), S.rankFilter, code => { S.rankFilter = code; renderRanking(); });
   const rows = S.selectable
-    .filter(t => S.rankFilter === 'all' ? !!(LG[t.league] && LG[t.league].top) : t.league === S.rankFilter)
+    .filter(t => S.rankFilter === 'all' ? !!(LG[t.league] && LG[t.league].tier === 1) : t.league === S.rankFilter)
     .sort((a, b) => S.strength.get(b.name).rating - S.strength.get(a.name).rating)
     .slice(0, S.rankFilter === 'all' ? 30 : 40);
   const body = rows.map((t, k) => {
@@ -2683,7 +2694,7 @@ function renderMethod() {
       <p>${th('m7')}</p>
       <p>${th('m9', { n: fmtInt(SIM.n), b: dec(SIM.base, 2), d: dec(SIM.drift, 2) })}</p>
       <p>${th('m3')}</p>
-      <p>${th('m8', { n: fmtInt(d.merged) })}</p>
+      <p>${th('m8', { n: fmtInt(d.played.filter(r => r.xh === undefined && r.sxh !== undefined).length), w: pct(CFG.shotWeight || 0) })}</p>
       <p>${th('m4')}</p>
       <p class="note">${esc(tx('verStamp', { v: ENGINE_VERSION, c: CFG_HASH, d: d.snap && d.snap.generated ? d.snap.generated.replace('T', ' ').replace('Z', ' UTC') : '—' }))}</p>
     </div>
@@ -2718,9 +2729,10 @@ function sourcesPanel() {
   };
   const src = snap ? snap.sources || {} : {};
   const fd = src['football-data.org'], us = src.Understat, ol = src.OpenLigaDB, od = src['The Odds API'];
+  const es = Object.assign({}, src.ESPN || { ok: true }, d.failed ? { ok: true, carriedOver: true } : {});
   const rows = [
-    ['openfootball', { ok: true }, dateOf(S.lastDay ? isoDay(S.lastDay) : null), tx('srcBase', { n: fmtInt(d.ofCount) })],
-    ['football-data.org', fd, fd && dateOf(fd.lastMatch), fd && fd.ok !== false ? tx('srcFd', { n: fmtInt(d.extraN), f: fmtInt((snap.cupFixtures || []).length) }) : (fd && fd.error) || ''],
+    ['ESPN', es, dateOf(S.lastDay ? isoDay(S.lastDay) : null), tx('srcBase', { n: fmtInt(d.ofCount), l: fmtInt(d.liveN || 0) })],
+    ['football-data.org', fd, fd && dateOf(fd.lastMatch), fd && fd.ok !== false ? tx('srcFd', { t: fmtInt(Object.keys(d.standings).length), n: fmtInt(fd.checked || 0) }) : (fd && fd.error) || ''],
     ['Understat', us, us && dateOf(us.lastMatch), us && us.ok !== false ? tx('srcXg', { n: fmtInt(d.xgN) }) : ''],
     ['OpenLigaDB', ol, ol && dateOf(ol.lastMatch), ol && ol.ok !== false ? tx('srcOl', { n: fmtInt(ol.matches || 0) }) : ''],
     ['The Odds API', od, od && od.fetchedAt ? ago(od.fetchedAt) : '—', od && od.ok !== false ? tx('srcOdds', { n: fmtInt(d.odds.size), r: od.remaining == null ? '—' : od.remaining, h: od.refreshHours || 24 }) : (od && od.error) || ''],
@@ -2749,7 +2761,7 @@ function healthPanel() {
     const el = d.snap.elo;
     items.push(d.eloStart && el ? tx('hElo', { n: fmtInt(el.matches || 0), s: el.first ? seasonLabel(el.first) : '2018/19' }) : tx('hEloNone'));
   }
-  items.push(tx('hNames', { n: fmtInt(d.merged) }));
+  items.push(tx('hNames', { n: fmtInt(d.played.filter(r => r.xh === undefined && r.sxh !== undefined).length) }));
   return `<div class="eyebrow" style="margin:18px 0 6px">${esc(tx('healthTitle'))}</div>
     <ul class="health">${items.map(i => `<li>${esc(i)}</li>`).join('')}</ul>`;
 }
@@ -2914,7 +2926,8 @@ function requestProj(code) {
 const projPct = p => (p <= 0 ? '—' : p < 0.005 ? '<' + NF.pct0.format(0.01) : p > 0.995 && p < 1 ? '>' + NF.pct0.format(0.99) : NF.pct0.format(p));
 function renderProjections() {
   if (!S.proj) return;
-  const lgs = LEAGUES.filter(l => S.tables[l.code] && S.tables[l.code].rows.length);
+  // double round-robins only: the split leagues' second stages are not modelled
+  const lgs = LEAGUES.filter(l => l.proj && S.tables[l.code] && S.tables[l.code].rows.length);
   $('proj-sec').hidden = !lgs.length;
   if (!lgs.length) return;
   if (!S.projLeague || !lgs.some(l => l.code === S.projLeague)) {

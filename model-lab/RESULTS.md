@@ -1,3 +1,62 @@
+# MatchLab v7 — ESPN data, six more leagues, shots
+
+## Why
+
+openfootball, v6's main source, stopped updating on 22 September 2026; v6 kept going on football-data.org's
+results. v7 takes every result and fixture from ESPN's public scoreboard API (`collector/espn.py`):
+2018/19 onwards, 22 competitions, one team id across seasons, divisions and cups (no name merging needed),
+shots per match. The page reads the collector's snapshot and adds the current month live from ESPN.
+
+New: Belgian Pro League, Süper Lig, Scottish Premiership, Austrian Bundesliga, Super League Greece, Danish
+Superliga, plus Europa League and Conference League as links between leagues. The Swiss Super League is
+left out (ESPN has no matches since 2025/26). Known holes on ESPN: Scottish Premiership 2023/24 (52 of 228)
+and 2. Bundesliga from November 2023 to April 2024. Extra-time results carry no 90-minute score and are
+left out of the model.
+
+## Protocol
+
+Unchanged (below): settings chosen on 2022/23–2023/24, tested untouched on 2024/25–2026/27, paired
+differences ±2 standard errors. `LAB_SOURCE=espn` (the default now; `of` = openfootball) and
+`out_espn/`. On the T14 (8 cores, 16 threads) a 40-run grid over five seasons takes about 40 s.
+
+**Data parity.** Dixon-Coles alone on ESPN with v6's competitions scores like v6 on openfootball
+(2023/24 0.9775 vs 0.9780, 2024/25 0.9859 vs 0.9872, 2025/26 0.9994 vs 1.0000).
+
+## Tests (v6's eight leagues unless said otherwise)
+
+Shot-based expected goals: goals = 0.356 × shots on target (+ 0 × other shots), non-negative least
+squares on league matches before 2022. Plain least squares gave −0.068 × other shots, i.e. negative
+expected goals for a side with many wild shots; that version was discarded.
+
+| Change (Dixon-Coles alone) | Validation Δ log-loss | Test Δ log-loss |
+|---|---|---|
+| fit on every competition (`train=all`) | −0.0004 ± 0.0005 | −0.0006 ± 0.0006 |
+| + shots as 40 % of the target where Understat has no xG (`shotWeight` 0.4, best of 0.1–0.7 on validation; 0.3–0.5 within 0.0001) | −0.0015 ± 0.0013 | −0.0012 ± 0.0016 |
+
+| Final blend (each with its Elo weight chosen on validation) | Validation | Test | per test season |
+|---|---|---|---|
+| v7: all competitions + shots 0.4, Elo 40 % − v6-style on ESPN, Elo 50 % | −0.0008 ± 0.0008 | −0.0008 ± 0.0010 | −0.0007, −0.0006, −0.0016 |
+
+Better in all five seasons, within the noise: adopted because it is the same model on more data, not
+because it was proven better. Elo now runs on every competition since 2018 (38,305 matches before the
+page's window), which is why its weight rose from 35 % to 40–50 %.
+
+**The six new leagues** (eval=new, 2,899 validation / 3,342 test matches): blend log-loss 0.972 / 0.978 /
+0.987 / 1.012 / 0.972 (2022/23 … 2026/27), close to the big leagues. Shots there: validation +0.0004 ±
+0.0008, test **−0.0024 ± 0.0021**.
+
+Commands: `grid e train=orig,all shotWeight=0,0.2,0.3,0.4 seasons=2022-23,…,2026-27`, `grid v train=all
+shotWeight=0.5,0.6,0.7`, `elo e_trainorig_shotWeight0`, `ens <run> elo_K20_h70`, `grid n train=all
+shotWeight=0,0.4 eval=new seasons=…`, each followed by `diff`.
+
+## Live track record
+
+The v6 forecasts already locked are scored against ESPN's results (same competition, within a day, club
+names sharing a word). The 88 v6 forecasts still open when v7 went live were voided ("replaced by the v7
+forecast") and v7 issued its own, so no match is counted twice.
+
+---
+
 # MatchLab v6 — what was tested, and what changed
 
 Every candidate change was judged by out-of-sample probability forecasts, not by hit rate.

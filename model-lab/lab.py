@@ -28,6 +28,7 @@ import numpy as np
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(os.path.dirname(HERE), "collector"))
 import collect as C  # noqa: E402  (reuses the collector's downloads, cache and name matching)
+import espn as E  # noqa: E402  (v7: ESPN results, every competition, stable team ids, shots)
 
 try:
     sys.stdout.reconfigure(encoding="utf-8")
@@ -41,10 +42,21 @@ LEAGUES = list(C.LEAGUES)                      # en.1 en.2 es.1 de.1 it.1 fr.1 n
 HISTORY = C.HISTORY_ONLY                       # es.2 de.2 it.2 fr.2
 UCL = "uefa.cl"
 CANON = os.environ.get("LAB_RAW_NAMES") != "1"   # LAB_RAW_NAMES=1: openfootball's names as they are
+SOURCE = os.environ.get("LAB_SOURCE", "espn")     # espn (v7) or of (openfootball, v6)
+if SOURCE == "espn":
+    OUT = os.path.join(HERE, "out_espn")
 VALIDATION = ["2022-23", "2023-24"]
 TEST = ["2024-25", "2025-26", "2026-27"]
+# train: which competitions the model is fitted on - orig = v6's (8 leagues, 4 second tiers, Champions
+# League), all = every ESPN competition. eval: the leagues scored - orig = v6's 8, new = the leagues v7 adds.
+# shotWeight: share of the fitting target taken from shots (shot-based expected goals) where Understat has no xG.
 BASE_CFG = dict(halfLife=240.0, sigma=0.5, tau=0.5, homeSd=0.1, xgWeight=0.6, rho=1, maxIter=400, tol=1e-5,
-                xgMode="blend", xgSepWeight=0.0, maxg=10)
+                xgMode="blend", xgSepWeight=0.0, maxg=10, train="orig", eval="orig", shotWeight=0.0)
+STR_KEYS = ("xgMode", "train", "eval")
+NEW_LEAGUES = [c for c, v in E.COMPS.items() if v["kind"] == "league" and c not in E.ORIGINAL]
+TRAIN_SETS = {"orig": E.ORIGINAL + ["es.2", "de.2", "it.2", "fr.2", "uefa.cl"], "all": list(E.COMPS),
+              "noecl": [c for c in E.COMPS if c != "uefa.ecl"]}
+EVAL_SETS = {"orig": E.ORIGINAL, "new": NEW_LEAGUES, "all": E.ORIGINAL + NEW_LEAGUES}
 
 
 def skey(y):
@@ -61,7 +73,109 @@ def canonical_names(records):
 
 
 # ------------------------------------------------------------------ data
+def understat_rows(y0):
+    """(code, season, day, home, away, xG home, xG away) of every Understat result since FIRST_SEASON."""
+    out = []
+    for code, L in C.LEAGUES.items():
+        if not L["us"]:
+            continue
+        for y in range(FIRST_SEASON, y0 + 1):
+            def fetch(lg=L["us"], yy=y):
+                raw, _ = C.http(f"https://understat.com/getLeagueData/{lg}/{yy}",
+                                {"X-Requested-With": "XMLHttpRequest", "Referer": f"https://understat.com/league/{lg}/{yy}"})
+                time.sleep(1.5)
+                return json.loads(raw)
+            try:
+                j, _ = C.cached(f"us_{L['us']}_{y}", fetch, 12 if y >= y0 - 1 else None)
+            except Exception as e:
+                print("Understat", L["us"], y, "unavailable:", str(e)[:80])
+                continue
+            for m in j.get("dates", []):
+                if m.get("isResult"):
+                    out.append((code, skey(y), date.fromisoformat(m["datetime"][:10]), m["h"]["title"], m["a"]["title"],
+                                float(m["xG"]["h"]), float(m["xG"]["a"])))
+    return out
+
+
+SHOT_FIT_BEFORE = 2022      # shot -> goal coefficients use seasons before the validation seasons only
+
+
+def load_espn(refresh=False):
+    pk = os.path.join(LAB_CACHE, "lab_data_espn.pkl")
+    if not refresh and os.path.exists(pk) and time.time() - os.path.getmtime(pk) < 12 * 3600:
+        return pickle.load(open(pk, "rb"))
+    y0 = C.season_start_year()
+    ms, errs = E.load(first=FIRST_SEASON, max_age_hours=12)
+    if errs:
+        print(f"ESPN: {len(errs)} months unavailable, e.g. {errs[0]}")
+    names = E.team_names(ms)
+    # one display name per team id; a name two ids share gets the id appended (never seen so far)
+    by_name = {}
+    for i, n in names.items():
+        by_name.setdefault(n, []).append(i)
+    label = {i: (n if len(by_name[n]) == 1 else f"{n} #{i}") for i, n in names.items()}
+    rows = []
+    for m in ms:
+        if "hg" not in m or m.get("et"):           # fixtures; extra-time results have no 90-minute score
+            continue
+        rows.append(dict(d=date.fromisoformat(m["d"]), h=label[m["hi"]], a=label[m["ai"]], hg=m["hg"], ag=m["ag"],
+                         comp=m["comp"], season=m["season"], cup=E.COMPS[m["comp"]]["kind"] == "cup",
+                         sh=m.get("hs", np.nan), sa=m.get("as", np.nan), toh=m.get("hsot", np.nan), toa=m.get("asot", np.nan)))
+    # Understat xG onto ESPN's names: align matches on the same day, league by league
+    nxg = 0
+    pair = {}
+    for r in rows:
+        if not r["cup"]:
+            pair.setdefault((r["comp"], r["h"], r["a"]), []).append(r)
+    us = understat_rows(y0)
+    for code in C.LEAGUES:
+        nm = C.NameMap()
+        nm.learn([(d, h, a) for c, s, d, h, a, *_ in us if c == code], [(r["d"], r["h"], r["a"]) for r in rows if r["comp"] == code])
+        pool = {t for r in rows if r["comp"] == code for t in (r["h"], r["a"])}
+        for c, s, d, hn, an, xh, xa in us:
+            if c != code:
+                continue
+            h, a = nm.get(hn, pool), nm.get(an, pool)
+            for r in pair.get((code, h, a), ()) if h and a else ():
+                if abs((r["d"] - d).days) <= 3:
+                    r["xh"], r["xa"] = xh, xa
+                    nxg += 1
+                    break
+    # shot-based expected goals: goals ~ a * shots on target + b * other shots, non-negative least squares
+    # on the league matches before SHOT_FIT_BEFORE (no validation or test season is used). Plain least
+    # squares gives b < 0, i.e. negative expected goals for a side with many wild shots and none on target.
+    from scipy.optimize import nnls
+    fitrows = [r for r in rows if not r["cup"] and r["d"].year < SHOT_FIT_BEFORE and not np.isnan(r["toh"]) and not np.isnan(r["sh"])]
+    Xs = np.array([[r["toh"], r["sh"] - r["toh"]] for r in fitrows] + [[r["toa"], r["sa"] - r["toa"]] for r in fitrows], float)
+    ys = np.array([r["hg"] for r in fitrows] + [r["ag"] for r in fitrows], float)
+    coef = nnls(Xs, ys)[0]
+    print(f"shot model: goals = {coef[0]:.3f} x on target + {coef[1]:.3f} x other shots ({len(fitrows)} matches before {SHOT_FIT_BEFORE})")
+
+    rows.sort(key=lambda r: r["d"])
+    teams = sorted({r["h"] for r in rows} | {r["a"] for r in rows})
+    ti = {t: i for i, t in enumerate(teams)}
+    comps = sorted({r["comp"] for r in rows})
+    arr = lambda k: np.array([r.get(k, np.nan) for r in rows], float)
+    toh, toa, sh, sa = arr("toh"), arr("toa"), arr("sh"), arr("sa")
+    D = dict(
+        teams=teams, comps=comps,
+        day=np.array([r["d"].toordinal() for r in rows], np.int64),
+        h=np.array([ti[r["h"]] for r in rows], np.int64), a=np.array([ti[r["a"]] for r in rows], np.int64),
+        hg=arr("hg"), ag=arr("ag"), xh=arr("xh"), xa=arr("xa"),
+        sxh=coef[0] * toh + coef[1] * (sh - toh), sxa=coef[0] * toa + coef[1] * (sa - toa),
+        comp=np.array([comps.index(r["comp"]) for r in rows], np.int64),
+        season=np.array([int(r["season"][:4]) for r in rows], np.int64),
+        cup=np.array([r["cup"] for r in rows], bool), shotCoef=coef,
+    )
+    os.makedirs(LAB_CACHE, exist_ok=True)
+    pickle.dump(D, open(pk, "wb"))
+    print(f"{len(rows)} matches, {len(teams)} teams, xG on {nxg}, shots on {int((~np.isnan(D['sxh'])).sum())}; seasons {FIRST_SEASON}..{y0}")
+    return D
+
+
 def load_all(refresh=False, canon=None):
+    if SOURCE == "espn":
+        return load_espn(refresh)
     canon = CANON if canon is None else canon
     pk = os.path.join(LAB_CACHE, f"lab_data{'' if canon else '_raw'}.pkl")
     if not refresh and os.path.exists(pk) and time.time() - os.path.getmtime(pk) < 12 * 3600:
@@ -207,6 +321,12 @@ def fit(D, idx, asof, cfg, init=None, xw=None):
     xh, xa = D["xh"][idx], D["xa"][idx]
     X = np.where(np.isnan(xh) | (xw <= 0), gx, (1 - xw) * gx + xw * np.nan_to_num(xh))
     Y = np.where(np.isnan(xa) | (xw <= 0), gy, (1 - xw) * gy + xw * np.nan_to_num(xa))
+    sw = cfg.get("shotWeight", 0.0)
+    if sw > 0 and "sxh" in D:                   # no Understat xG: shot-based expected goals where ESPN has shots
+        sh, sa = D["sxh"][idx], D["sxa"][idx]
+        use = np.isnan(xh) & ~np.isnan(sh)
+        X = np.where(use, (1 - sw) * gx + sw * np.nan_to_num(sh), X)
+        Y = np.where(use, (1 - sw) * gy + sw * np.nan_to_num(sa), Y)
     W = np.exp(-math.log(2) / cfg["halfLife"] * (asof - D["day"][idx]))
     # a team's league = its latest domestic competition before asof
     lg_of = np.full(T, -1)
@@ -301,9 +421,12 @@ def walk(season, cfg):
     D = DATA
     y = int(season[:4])
     start = date(y, 7, 1).toordinal(); end = min(date(y + 1, 7, 1).toordinal(), date.today().toordinal() + 1)
-    lg_codes = {D["comps"].index(c) for c in ([UCL] if cfg.get("evalCup") else LEAGUES) if c in D["comps"]}
+    ev = [UCL] if cfg.get("evalCup") else (EVAL_SETS[cfg.get("eval", "orig")] if SOURCE == "espn" else LEAGUES)
+    lg_codes = {D["comps"].index(c) for c in ev if c in D["comps"]}
     eval_mask = np.isin(D["comp"], list(lg_codes)) & (D["season"] == y)
     window = (D["season"] >= y - 2) & (D["season"] <= y)          # the page loads three seasons
+    if SOURCE == "espn":
+        window &= np.isin(D["comp"], [D["comps"].index(c) for c in TRAIN_SETS[cfg.get("train", "orig")] if c in D["comps"]])
     wk = start - date.fromordinal(start).weekday()
     out = dict(i=[], p=[], lam=[], nu=[], rho=[], pg=[], px=[])
     init = init_g = init_x = None
@@ -477,7 +600,7 @@ def _job(args):
     return name, season, time.time() - t0
 
 
-def run(jobs, procs=4):
+def run(jobs, procs=min(16, os.cpu_count() or 4)):
     with Pool(procs, initializer=_init) as pool:
         for name, season, dt in pool.imap_unordered(_job, jobs):
             print(f"  done {name} {season} in {dt:.0f}s", flush=True)
@@ -492,7 +615,7 @@ def parse_cfg(kvs):
     cfg = dict(BASE_CFG)
     for kv in kvs:
         k, v = kv.split("=")
-        cfg[k] = v if k == "xgMode" else (int(v) if k in ("rho", "maxg", "maxIter") else float(v))
+        cfg[k] = v if k in STR_KEYS else (int(v) if k in ("rho", "maxg", "maxIter") else float(v))
     return cfg
 
 

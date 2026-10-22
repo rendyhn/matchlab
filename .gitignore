@@ -3,6 +3,7 @@ collector/config.local.json
 collector/cache/
 model-lab/cache/
 model-lab/out/
+model-lab/out_espn/
 old-versions/
 __pycache__/
 _site/

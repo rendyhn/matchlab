@@ -1,5 +1,5 @@
 // MatchLab - how uncertain should a season projection be? Walk-forward test of simulateLeague().
-//   node model-lab/sim_test.mjs            (Node 18+, fetches openfootball; cache in model-lab/cache)
+//   node model-lab/sim_test.mjs            (Node 18+; needs model-lab/cache/espn_all.json, see below)
 // Every four weeks of a season, the model is fitted on the matches before that day only (the
 // page's three seasons, Elo carried from 2018 like the collector's snapshot, Understat xG from
 // data/latest.json where it has the match), then the rest of the season is simulated and the
@@ -7,7 +7,7 @@
 // engine.js) is tried on 2024/25; the best is then tested untouched on 2025/26.
 // Scores, per team and checkpoint: ranked probability score over the final positions (main),
 // log-loss of the actual position, and the Brier score of champion / top places / relegation.
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runInThisContext } from 'node:vm';
@@ -15,31 +15,11 @@ import { runInThisContext } from 'node:vm';
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 runInThisContext(readFileSync(join(root, 'engine.js'), 'utf8'), { filename: 'engine.js' });
 const E = globalThis;
-const CACHE = join(root, 'model-lab', 'cache', 'openfootball');
-mkdirSync(CACHE, { recursive: true });
-
-async function fetchJson(url) {
-  const f = join(CACHE, url.split('/').slice(-2).join('_'));
-  if (existsSync(f)) { const t = readFileSync(f, 'utf8'); return t === 'null' ? null : JSON.parse(t); }
-  for (let k = 1; ; k++) {
-    try {
-      const r = await fetch(url);
-      if (r.status === 404) { writeFileSync(f, 'null'); return null; }
-      if (!r.ok) throw new Error('HTTP ' + r.status);
-      const j = await r.json(); writeFileSync(f, JSON.stringify(j)); return j;
-    } catch (e) { if (k >= 3) throw e; await new Promise(res => setTimeout(res, 1500 * k)); }
-  }
-}
+// every ESPN match since 2018, in the snapshot's layout: python collector/espn.py 2018 --export model-lab/cache/espn_all.json
+const allPath = join(root, 'model-lab', 'cache', 'espn_all.json');
+if (!existsSync(allPath)) throw new Error('run first: python collector/espn.py 2018 --export model-lab/cache/espn_all.json');
+const ALL = E.decodeMatches(JSON.parse(readFileSync(allPath, 'utf8')));
 const seasonKey = y => `${y}-${String((y + 1) % 100).padStart(2, '0')}`;
-async function files(seasons) {
-  const jobs = [];
-  for (const s of seasons) {
-    for (const l of E.LEAGUES) jobs.push({ s, code: l.code, kind: 'league' });
-    for (const c of E.HISTORY_ONLY) jobs.push({ s, code: c, kind: 'history' });
-    for (const c of E.CUPS) jobs.push({ s, code: c, kind: 'cup' });
-  }
-  return Promise.all(jobs.map(async j => Object.assign({}, j, { json: await fetchJson(`${E.BASE}${j.s}/${j.code}.json`) })));
-}
 
 const snapPath = join(root, 'data', 'latest.json');
 const snap = existsSync(snapPath) ? JSON.parse(readFileSync(snapPath, 'utf8')) : null;
@@ -49,19 +29,15 @@ const today = E.todayDay();
 async function seasonData(S) {
   const y = +S.slice(0, 4);
   const three = [S, seasonKey(y - 1), seasonKey(y - 2)];
-  const all = []; for (let k = 2018; k <= y; k++) all.push(seasonKey(k));
-  const data = E.buildData(await files(three), today, S, three);
+  const data = E.buildData(ALL, today, S, three, { failed: 0, live: 0 });
   if (snap) E.mergeSnapshot(data, { xg: snap.xg });          // xG only: the rest is this season's
   // Elo from 2018 up to where the three seasons begin, as the collector does
-  const full = E.buildData(await files(all), today, S, all);
   const start = E.seasonStart(three[2]);
-  const R = E.eloRun(full.played.filter(r => r.day < start), null);
-  const ratings = new Map();
-  for (const [raw, c3] of data.cmap) { const ca = full.cmap.get(raw); if (ca !== undefined && R.has(ca) && !ratings.has(c3)) ratings.set(c3, R.get(ca)); }
-  data.eloStart = { day: start, ratings, n: ratings.size };
+  const before = ALL.filter(r => r.hg !== undefined && !r.et && r.day < start).sort((u, v) => u.day - v.day);
+  const R = E.eloRun(before, null);
+  data.eloStart = { day: start, ratings: R, n: R.size };
   return data;
 }
-
 function finalTable(data, code) {
   const rows = E.leagueTable(data, code, Infinity, null);
   const list = [...rows.values()].sort((a, b) => b.pts - a.pts || b.gd - a.gd || b.gf - a.gf || (a.team < b.team ? -1 : 1));
@@ -74,7 +50,8 @@ const NSIM = +(process.env.NSIM || 2000);
 
 async function runSeason(S) {
   const data = await seasonData(S);
-  const truth = new Map(E.LEAGUES.map(l => [l.code, finalTable(data, l.code)]));
+  const LGS = E.LEAGUES.filter(l => l.proj);                // double round-robins: what the page projects
+  const truth = new Map(LGS.map(l => [l.code, finalTable(data, l.code)]));
   const lgMatches = data.played.filter(r => !r.cup && r.season === S && E.LG[r.comp]);
   const first = lgMatches[0].day, lastDay = lgMatches[lgMatches.length - 1].day;
   const out = GRID.map(() => ({ units: [] }));              // one unit = one league at one checkpoint
@@ -84,7 +61,7 @@ async function runSeason(S) {
       fixtures: data.played.filter(r => !r.cup && r.season === S && r.day >= D).map(r => ({ day: r.day, h: r.h, a: r.a, comp: r.comp, cup: false })),
     });
     const st = E.prepare(sub, D);
-    for (const l of E.LEAGUES) {
+    for (const l of LGS) {
       const tr = truth.get(l.code), z = E.ZONES[l.code];
       GRID.forEach((g, gi) => {
         const res = E.simulateLeague(st, l.code, { n: NSIM, base: g.base, drift: g.drift, seed: 7 + D });

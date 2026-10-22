@@ -14,8 +14,8 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 runInThisContext(readFileSync(join(root, 'engine.js'), 'utf8'), { filename: 'engine.js' });
 const E = globalThis;
 
-// Same files as the page. A league file that fails for another reason than "does not exist" is
-// retried; if it still fails the run stops - better no forecasts than forecasts from partial data.
+// Same data as the page: the snapshot the collector has just written, plus this month's ESPN results.
+// A request is retried; a competition-month that still fails keeps the snapshot's rows (minutes old).
 async function fetchJson(url) {
   for (let attempt = 1; ; attempt++) {
     try {
@@ -32,9 +32,9 @@ async function fetchJson(url) {
 
 const snapPath = join(root, 'data', 'latest.json');
 const snap = existsSync(snapPath) ? JSON.parse(readFileSync(snapPath, 'utf8')) : null;
-const data = await E.loadData(fetchJson);
-if (data.failed) throw new Error(`${data.failed} openfootball files could not be fetched - nothing archived`);
-if (!data.curFiles.length || !data.played.length) throw new Error('no openfootball data - nothing archived');
+const data = await E.loadData(fetchJson, null, snap);
+if (!data || !data.curComps.length || !data.played.length) throw new Error('no match data in the snapshot - nothing archived');
+if (data.failed) console.log(`${data.failed} live ESPN requests failed - the snapshot's rows are used for them`);
 E.mergeSnapshot(data, snap);
 const now = Date.now();
 const st = E.prepare(data, E.todayDay() + 1);
@@ -42,7 +42,29 @@ const st = E.prepare(data, E.todayDay() + 1);
 const archPath = join(root, 'data', 'forecasts.json');
 const archive = existsSync(archPath) ? JSON.parse(readFileSync(archPath, 'utf8'))
   : { v: 1, about: 'MatchLab forecasts, locked when the match day begins (00:00 UTC) and scored after the match. Written by collector/forecast.mjs.', forecasts: {} };
-const settled = E.settleForecasts(archive, data, E.utcDayOf(now));
+// v6 -> v7: v6 named clubs as openfootball does ("FC Bayern München"), v7 as ESPN does ("Bayern Munich").
+// A v6 forecast still open (its match day has not begun) is replaced by v7's own; a locked one is
+// scored against the ESPN result of the same competition within a day whose club names share a word.
+const today = E.utcDayOf(now);
+let migrated = 0;
+{
+  const byCompDay = new Map();
+  for (const r of data.played) { const k = `${r.comp}|${r.day}`; if (!byCompDay.has(k)) byCompDay.set(k, []); byCompDay.get(k).push(r); }
+  const shares = (a, b) => { const ta = E.toks(a); for (const t of E.toks(b)) if (ta.has(t)) return true; return false; };
+  for (const e of Object.values(archive.forecasts)) {
+    if (e.res || e.void || (e.model || 'v6') !== 'v6') continue;
+    const d = E.parseDay(e.d);
+    if (d > today) { e.void = 'replaced by the v7 forecast (not locked yet)'; migrated++; continue; }
+    let hit = null;
+    for (const k of [0, -1, 1]) for (const r of byCompDay.get(`${e.comp}|${d + k}`) || []) if (!hit && shares(e.h, r.h) && shares(e.a, r.a)) hit = r;
+    if (!hit) continue;
+    const o = hit.hg > hit.ag ? 0 : hit.hg === hit.ag ? 1 : 2, s = E.scoreOne(e.p, o), r4 = v => Math.round(v * 1e4) / 1e4;
+    e.res = [hit.hg, hit.ag]; e.o = o; e.played = E.isoDay(hit.day); e.ll = r4(s.ll); e.br = r4(s.br); e.rps = r4(s.rps);
+    if (e.mkt) e.mll = r4(E.scoreOne(e.mkt, o).ll);
+    migrated++;
+  }
+}
+const settled = E.settleForecasts(archive, data, today);
 const issued = E.issueForecasts(archive, st, now);
 archive.updated = new Date(now).toISOString().slice(0, 19) + 'Z';
 
@@ -57,6 +79,7 @@ writeFileSync(join(root, 'data', 'track.js'), 'window.MATCHLAB_TRACK=' + JSON.st
 
 console.log(`engine ${E.ENGINE_VERSION} (settings ${E.CFG_HASH}), data ${snap ? snap.generated : 'none'}, `
   + `Elo history ${data.eloStart ? data.eloStart.n + ' teams' : 'missing'}`);
+if (migrated) console.log(`v6 forecasts migrated to ESPN results: ${migrated}`);
 console.log(`issued/updated ${issued}, newly scored ${settled}; archive: ${summary.total} forecasts, `
   + `${summary.settled} scored, ${summary.locked} locked, ${summary.open} open, ${summary.void} void`);
 if (summary.settled) console.log(`log-loss ${summary.ll.toFixed(4)}, Brier ${summary.brier.toFixed(4)}, top pick ${(100 * summary.acc).toFixed(1)}%`);

@@ -7,27 +7,47 @@
 function matchlabEngine(root) {
 'use strict';
 
-const ENGINE_VERSION = 'v6';
+const ENGINE_VERSION = 'v7';
 
 /* ------------------------------------------------------------------ config */
-const BASE = 'https://raw.githubusercontent.com/openfootball/football.json/master/';
+// Results and fixtures: ESPN's public scoreboard API (collector/espn.py builds the snapshot's
+// `matches`; the page adds the current month live). Same team id in every season and division.
+const ESPN = 'https://site.api.espn.com/apis/site/v2/sports/soccer/';
+// top: the seven big first divisions (the power ranking's reference opponent);
+// proj: double round-robin with known places, so the season projection applies.
 const LEAGUES = [
-  { code: 'en.1', name: 'Premier League', short: 'PL', top: true },
-  { code: 'es.1', name: 'La Liga', short: 'LALIGA', top: true },
-  { code: 'de.1', name: 'Bundesliga', short: 'BUNDES', top: true },
-  { code: 'it.1', name: 'Serie A', short: 'SERIE A', top: true },
-  { code: 'fr.1', name: 'Ligue 1', short: 'LIGUE 1', top: true },
-  { code: 'nl.1', name: 'Eredivisie', short: 'EREDIV', top: true },
-  { code: 'pt.1', name: 'Liga Portugal', short: 'PORTUGAL', top: true },
-  { code: 'en.2', name: 'Championship', short: 'CHAMP', top: false },
+  { code: 'en.1', name: 'Premier League', short: 'PL', top: true, tier: 1, proj: true, espn: 'eng.1' },
+  { code: 'es.1', name: 'La Liga', short: 'LALIGA', top: true, tier: 1, proj: true, espn: 'esp.1' },
+  { code: 'de.1', name: 'Bundesliga', short: 'BUNDES', top: true, tier: 1, proj: true, espn: 'ger.1' },
+  { code: 'it.1', name: 'Serie A', short: 'SERIE A', top: true, tier: 1, proj: true, espn: 'ita.1' },
+  { code: 'fr.1', name: 'Ligue 1', short: 'LIGUE 1', top: true, tier: 1, proj: true, espn: 'fra.1' },
+  { code: 'nl.1', name: 'Eredivisie', short: 'EREDIV', top: true, tier: 1, proj: true, espn: 'ned.1' },
+  { code: 'pt.1', name: 'Liga Portugal', short: 'PORTUGAL', top: true, tier: 1, proj: true, espn: 'por.1' },
+  { code: 'en.2', name: 'Championship', short: 'CHAMP', top: false, tier: 2, proj: true, espn: 'eng.2' },
+  { code: 'be.1', name: 'Belgian Pro League', short: 'BELGIUM', top: false, tier: 1, proj: false, espn: 'bel.1' },
+  { code: 'tr.1', name: 'Süper Lig', short: 'TÜRKİYE', top: false, tier: 1, proj: false, espn: 'tur.1' },
+  { code: 'sc.1', name: 'Scottish Premiership', short: 'SCOTLAND', top: false, tier: 1, proj: false, espn: 'sco.1' },
+  { code: 'at.1', name: 'Austrian Bundesliga', short: 'AUSTRIA', top: false, tier: 1, proj: false, espn: 'aut.1' },
+  { code: 'gr.1', name: 'Super League Greece', short: 'GREECE', top: false, tier: 1, proj: false, espn: 'gre.1' },
+  { code: 'dk.1', name: 'Danish Superliga', short: 'DENMARK', top: false, tier: 1, proj: false, espn: 'den.1' },
 ];
-const HISTORY_ONLY = ['es.2', 'de.2', 'it.2', 'fr.2'];   // history of promoted clubs
-// The link between league strengths. Files openfootball has not published yet (404) are still
-// requested so they are used as soon as they appear; those 404s are expected and handled.
-const CUPS = ['uefa.cl'];
+const HISTORY = [{ code: 'es.2', espn: 'esp.2' }, { code: 'de.2', espn: 'ger.2' }, { code: 'it.2', espn: 'ita.2' }, { code: 'fr.2', espn: 'fra.2' }];
+const HISTORY_ONLY = HISTORY.map(h => h.code);          // history of promoted clubs
+// The links between league strengths
+const CUP_LIST = [
+  { code: 'uefa.cl', name: 'Champions League', short: 'UCL', espn: 'uefa.champions' },
+  { code: 'uefa.el', name: 'Europa League', short: 'UEL', espn: 'uefa.europa' },
+  { code: 'uefa.ecl', name: 'Conference League', short: 'UECL', espn: 'uefa.europa.conf' },
+];
+const CUPS = CUP_LIST.map(c => c.code);
+const CUP = Object.fromEntries(CUP_LIST.map(c => [c.code, c]));
 const UCL = 'uefa.cl';
 const SECOND_TIER = new Set(['en.2'].concat(HISTORY_ONLY));
 const LG = Object.fromEntries(LEAGUES.map(l => [l.code, l]));
+// the Elo -> 1X2 mapping is fitted on v6's eight leagues, as in model-lab/lab.py where it was tested
+const ELO_MAP_COMPS = new Set(['en.1', 'es.1', 'de.1', 'it.1', 'fr.1', 'nl.1', 'pt.1', 'en.2']);
+const ALL_COMPS = LEAGUES.map(l => ({ code: l.code, espn: l.espn, kind: 'league' }))
+  .concat(HISTORY.map(h => ({ code: h.code, espn: h.espn, kind: 'history' })), CUP_LIST.map(c => ({ code: c.code, espn: c.espn, kind: 'cup' })));
 // Every setting below was checked by nested walk-forward validation in model-lab/lab.py
 // (model-lab/RESULTS.md): chosen on 2022/23-2023/24, then tested untouched on 2024/25-2026/27.
 //   halfLife/sigma/tau/homeSd/xgWeight: the grid's best values on 2022/23-2023/24 beat these by
@@ -37,9 +57,16 @@ const LG = Object.fromEntries(LEAGUES.map(l => [l.code, l]));
 //   Elo blend 35% (eloWeight, chosen on 2022/23-2023/24): -0.0020 (+-0.0012) log-loss on the test
 //     seasons, better in each of them; needs Elo history back to 2018 (snapshot.elo from the collector).
 //   A recalibration layer on top gained -0.0004 (+-0.0012) on the test seasons - not used.
+// v7 (ESPN data, same protocol, model-lab/RESULTS.md):
+//   every competition in the fit (6 more leagues, Europa and Conference League) + shot-based expected
+//   goals (0.356 x shots on target) as 40% of the target where Understat has no xG (shotWeight, chosen
+//   on 2022/23-2023/24). v6's eight leagues: -0.0012 (+-0.0016) log-loss on the test seasons for
+//   Dixon-Coles alone, -0.0008 (+-0.0010) after the Elo blend - better in all five seasons, within the
+//   noise. The six new leagues: shots -0.0024 (+-0.0021) on the test seasons.
+//   eloWeight 0.40: the blend weight chosen on 2022/23-2023/24 with Elo from every competition.
 const CFG = {
-  halfLife: 240, sigma: 0.5, tau: 0.5, homeSd: 0.1, maxIter: 400, tol: 1e-5, xgWeight: 0.6,
-  eloK: 20, eloHfa: 70, eloNewTop: 1500, eloNewSecond: 1350, eloWeight: 0.35, eloMapDays: 730,
+  halfLife: 240, sigma: 0.5, tau: 0.5, homeSd: 0.1, maxIter: 400, tol: 1e-5, xgWeight: 0.6, shotWeight: 0.4,
+  eloK: 20, eloHfa: 70, eloNewTop: 1500, eloNewSecond: 1350, eloWeight: 0.4, eloMapDays: 730,
 };
 // short fingerprint of the settings, stored with every archived forecast
 const CFG_HASH = (() => {
@@ -145,140 +172,147 @@ function canonicalNames(records) {
 }
 
 /* ------------------------------------------------------------------ data */
-// Full-time score, or null. Since 2025/26 openfootball writes a 0-0 as
-// "score": [0, 0] instead of {"ft": [0, 0]}. Without this every 0-0 of the current season
-// is lost: the model overestimates goals and underestimates draws.
-// The list form is trusted only when the match date has passed.
-function scoreFt(sc, day, today) {
-  let ft = null;
-  if (sc && !Array.isArray(sc) && Array.isArray(sc.ft)) ft = sc.ft;
-  else if (Array.isArray(sc) && day < today) ft = sc;
-  if (!ft || ft.length !== 2) return null;
-  const a = +ft[0], b = +ft[1];
-  return Number.isInteger(a) && Number.isInteger(b) && a >= 0 && b >= 0 ? [a, b] : null;
+// The snapshot's matches (collector: data/latest.json "matches") as records. A row is
+// [event id, day number, 'HH:MM' UTC, competition index, season start year, home index, away index,
+//  home goals, away goals, home shot xG, away shot xG, flags (1 extra time, 2 neutral venue), stage].
+// Goals are null for a fixture; extra-time results have no 90-minute score and are not used.
+function decodeMatches(M) {
+  const out = [];
+  for (const r of M.rows) {
+    const [id, day, time, ci, sy, hi, ai, hg, ag, sxh, sxa, flags, stage] = r;
+    const comp = M.comps[ci];
+    const rec = { id: String(id), day, time: time || '', h: M.teams[hi][1], a: M.teams[ai][1], comp,
+      season: `${sy}-${String((sy + 1) % 100).padStart(2, '0')}`, cup: !!CUP[comp], round: stage || '',
+      neutral: !!(flags & 2), et: !!(flags & 1) };
+    if (hg !== null && hg !== undefined) { rec.hg = hg; rec.ag = ag; }
+    if (sxh !== null && sxh !== undefined) { rec.sxh = sxh; rec.sxa = sxa; }
+    out.push(rec);
+  }
+  return out;
 }
 
-// fetchJson(url) -> parsed JSON, or null when the file does not exist; it throws on a network error.
-async function loadData(fetchJson, onProgress) {
+// One ESPN event -> record (mirror of normalise() in collector/espn.py), or null.
+function espnRecord(ev, comp, label, coef) {
+  const c = ev.competitions && ev.competitions[0];
+  if (!c || !c.competitors) return null;
+  const h = c.competitors.find(x => x.homeAway === 'home'), a = c.competitors.find(x => x.homeAway === 'away');
+  if (!h || !a) return null;
+  const st = (ev.status && ev.status.type) || {};
+  const ms = Date.parse(ev.date);
+  const sy = ev.season && Number.isInteger(ev.season.year) ? ev.season.year : +seasonKeyOf(utcDayOf(ms)).slice(0, 4);
+  const stage = ev.season && ev.season.slug && ev.season.slug !== 'regular-season' ? ev.season.slug : '';
+  const rec = { id: String(ev.id), day: utcDayOf(ms), time: new Date(ms).toISOString().slice(11, 16), comp,
+    h: label(h.team), a: label(a.team), season: `${sy}-${String((sy + 1) % 100).padStart(2, '0')}`, cup: !!CUP[comp],
+    round: stage, neutral: !!c.neutralSite, et: st.name === 'STATUS_FINAL_AET' || st.name === 'STATUS_FINAL_PEN' };
+  if (st.completed) {
+    const hg = parseInt(h.score, 10), ag = parseInt(a.score, 10);
+    if (!(hg >= 0 && ag >= 0)) return null;
+    rec.hg = hg; rec.ag = ag;
+    const stat = (x, n) => { const s = (x.statistics || []).find(v => v.name === n); const v = s ? parseInt(s.displayValue, 10) : NaN; return Number.isFinite(v) ? v : null; };
+    const hs = stat(h, 'totalShots'), as = stat(a, 'totalShots'), ht = stat(h, 'shotsOnTarget'), at = stat(a, 'shotsOnTarget');
+    if (coef && hs !== null && as !== null && ht !== null && at !== null) {
+      rec.sxh = Math.round(100 * (coef[0] * ht + coef[1] * (hs - ht))) / 100;
+      rec.sxa = Math.round(100 * (coef[0] * at + coef[1] * (as - at))) / 100;
+    }
+  } else if (st.state !== 'pre' || /POSTPONED|CANCELED|ABANDONED/.test(st.name || '')) {
+    return null;                       // live, postponed or cancelled: neither a result nor a fixture yet
+  }
+  return rec;
+}
+
+const ymOf = day => { const d = dayDate(day); return `${d.getUTCFullYear()}${String(d.getUTCMonth() + 1).padStart(2, '0')}`; };
+
+// The snapshot's matches, then this month's (and in a month's first week the previous month's) results
+// and fixtures straight from ESPN, so a result from an hour ago is in even between collector runs.
+// fetchJson(url) -> parsed JSON or null; it may throw. A competition-month that fails keeps the
+// snapshot's rows (counted in data.failed). Returns null without a snapshot.
+async function loadData(fetchJson, onProgress, snap) {
+  const M = snap && snap.matches;
+  if (!M || !Array.isArray(M.rows) || !M.rows.length) return null;
   const today = todayDay();
   const cur = seasonKeyOf(today);
   const seasons = [cur, prevSeason(cur), prevSeason(prevSeason(cur))];
+  const recs = decodeMatches(M);
+  // team id -> the snapshot's name; a club ESPN shows for the first time keeps ESPN's name
+  const byId = new Map(M.teams.map(([id, name]) => [String(id), name]));
+  const names = new Set(byId.values());
+  const label = t => {
+    const id = String(t.id);
+    if (!byId.has(id)) { let n = t.displayName || t.name || id; if (names.has(n)) n += ` #${id}`; byId.set(id, n); names.add(n); }
+    return byId.get(id);
+  };
+  const months = [ymOf(today)];
+  if (dayDate(today).getUTCDate() <= 7) months.push(ymOf(today - 8));
   const jobs = [];
-  for (const s of seasons) {
-    for (const l of LEAGUES) jobs.push({ s, code: l.code, kind: 'league' });
-    for (const c of HISTORY_ONLY) jobs.push({ s, code: c, kind: 'history' });
-    for (const c of CUPS) jobs.push({ s, code: c, kind: 'cup' });
-  }
-  let done = 0;
+  for (const c of ALL_COMPS) for (const ym of months) jobs.push({ c, ym });
+  let done = 0, failed = 0, live = 0;
   const got = await Promise.all(jobs.map(async j => {
     try {
-      return Object.assign({}, j, { json: await fetchJson(`${BASE}${j.s}/${j.code}.json`) });
+      const js = await fetchJson(`${ESPN}${j.c.espn}/scoreboard?dates=${j.ym}`);
+      return js && Array.isArray(js.events) ? js.events.map(ev => espnRecord(ev, j.c.code, label, M.shot)).filter(Boolean) : [];
     } catch (e) {
-      return Object.assign({}, j, { json: null, err: true });
+      failed++; return [];
     } finally {
       if (onProgress) onProgress(++done, jobs.length);
     }
   }));
-  return buildData(got, today, cur, seasons);
+  const byEvent = new Map(recs.map(r => [r.id, r]));
+  for (const list of got) for (const r of list) {
+    const old = byEvent.get(r.id);
+    if (!old || old.hg === undefined || r.hg !== undefined) { if (!old || old.hg === undefined) live += r.hg !== undefined ? 1 : 0; byEvent.set(r.id, r); }
+  }
+  // a fixture dropped from this month's live list (postponed) is dropped here too
+  const liveIds = new Set(got.flat().map(r => r.id));
+  const liveComps = new Set(jobs.map(j => j.c.code));
+  const monthSet = new Set(months);
+  const all = [...byEvent.values()].filter(r => r.hg !== undefined || !(liveComps.has(r.comp) && monthSet.has(ymOf(r.day)) && !liveIds.has(r.id) && failed === 0));
+  return buildData(all, today, cur, seasons, { failed, live, generated: M.generated || (snap && snap.generated) });
 }
 
-function buildData(got, today, cur, seasons) {
-  const files = [], records = [];
-  for (const g of got) {
-    if (!g.json || !Array.isArray(g.json.matches)) continue;
-    files.push({ s: g.s, code: g.code, kind: g.kind, n: g.json.matches.length });
-    for (const m of g.json.matches) {
-      if (!m.team1 || !m.team2 || !m.date) continue;
-      const day = parseDay(m.date);
-      records.push([cleanName(m.team1), g.s, g.code, day], [cleanName(m.team2), g.s, g.code, day]);
-    }
-  }
-  const cmap = canonicalNames(records);
+function buildData(recs, today, cur, seasons, info) {
+  const inWindow = new Set(seasons);
   const played = [], fixtures = [];
-  const teamLeague = new Map();          // this season's team -> league
-  for (const g of got) {
-    if (!g.json || !Array.isArray(g.json.matches)) continue;
-    for (const m of g.json.matches) {
-      if (!m.team1 || !m.team2 || !m.date) continue;
-      const h = cmap.get(cleanName(m.team1)), a = cmap.get(cleanName(m.team2));
-      const day = parseDay(m.date);
-      const ft = scoreFt(m.score, day, today);
-      if (g.kind === 'league' && g.s === cur) { teamLeague.set(h, g.code); teamLeague.set(a, g.code); }
-      const rec = { day, time: m.time || '', h, a, comp: g.code, season: g.s, cup: g.kind === 'cup', round: m.round || '' };
-      if (ft) {
-        rec.hg = ft[0]; rec.ag = ft[1]; played.push(rec);
-      } else if (g.kind === 'league' && g.s === cur) {
-        fixtures.push(rec);
-      }
+  const teamLeague = new Map();          // this season's team -> league (cup-only clubs -> their cup)
+  const cupTeams = new Set();
+  for (const r of recs) {
+    if (!inWindow.has(r.season)) continue;
+    if (r.season === cur) {
+      if (LG[r.comp]) { teamLeague.set(r.h, r.comp); teamLeague.set(r.a, r.comp); }
+      else if (r.cup) { cupTeams.add(r.h); cupTeams.add(r.a); }
     }
+    if (r.hg !== undefined) { if (!r.et) played.push(r); }
+    else if (r.day >= today && r.season === cur && (LG[r.comp] || r.cup)) fixtures.push(r);
   }
-  played.sort((x, y) => x.day - y.day);
-  fixtures.sort((x, y) => x.day - y.day || x.time.localeCompare(y.time));
-  const curFiles = files.filter(f => f.s === cur && f.kind === 'league');
-  let merged = 0; for (const [k, v] of cmap) if (k !== v) merged++;
-  return { cur, seasons, played, fixtures, teamLeague, files, curFiles, cmap, merged,
-    failed: got.filter(g => g.err).length, ofCount: played.length };
+  for (const r of recs) if (r.cup && r.season === cur) for (const t of [r.h, r.a]) if (!teamLeague.has(t)) teamLeague.set(t, r.comp);
+  played.sort((x, y) => x.day - y.day || x.time.localeCompare(y.time) || cmpStr(x.id, y.id));
+  fixtures.sort((x, y) => x.day - y.day || x.time.localeCompare(y.time) || cmpStr(x.h, y.h));
+  const curComps = [...new Set(played.filter(r => r.season === cur && LG[r.comp]).map(r => r.comp))];
+  return { cur, seasons, played, fixtures, teamLeague, cupTeams, curComps,
+    // kept for older callers: one file per competition with matches this season
+    curFiles: curComps.map(code => ({ s: cur, code, kind: 'league' })), files: [], cmap: new Map(), merged: 0,
+    failed: info.failed, liveN: info.live, ofCount: played.length };
 }
 
-// Adds what openfootball does not have, from the collector's snapshot (data/latest.js):
-// football-data.org results (Champions League, any league result openfootball has not entered yet),
-// official tables, Understat xG, bookmaker odds and Elo ratings back to 2018. Optional.
+// Adds the snapshot's other sections: Understat xG, official tables, bookmaker odds and Elo ratings
+// back to 2018 (all keyed by the same ESPN team names). Optional.
 function mergeSnapshot(data, snap) {
   data.snap = snap || null;
-  data.odds = new Map(); data.standings = {}; data.xgN = 0; data.extraN = 0; data.cupTeams = new Set(); data.eloStart = null;
+  data.odds = new Map(); data.standings = {}; data.xgN = 0; data.extraN = 0; data.eloStart = null;
+  if (!data.cupTeams) data.cupTeams = new Set();
   if (!snap) return;
-  const cn = n => data.cmap.get(n) || n;
   const today = todayDay();
-  const ofCupSeasons = new Set(data.played.filter(r => r.cup).map(r => r.season));
-  const near = new Map();              // season|comp|h|a -> [days] of openfootball league matches
-  for (const r of data.played) if (!r.cup) {
-    const k = `${r.season}|${r.comp}|${r.h}|${r.a}`;
-    if (!near.has(k)) near.set(k, []);
-    near.get(k).push(r.day);
-  }
-  for (const e of snap.extra || []) {
-    const day = parseDay(e.d), h = cn(e.h), a = cn(e.a);
-    if (e.cup) { if (ofCupSeasons.has(e.season)) continue; }            // openfootball caught up: no double count
-    else {
-      const ds = near.get(`${e.season}|${e.comp}|${h}|${a}`) || [];
-      if (ds.some(d => Math.abs(d - day) <= 3)) continue;
-    }
-    data.played.push({ day, time: '', h, a, comp: e.comp, season: e.season, cup: !!e.cup, round: e.stage || '', hg: e.hg, ag: e.ag, src: e.src });
-    data.extraN++;
-  }
-  data.played.sort((x, y) => x.day - y.day);
-  const xg = new Map();
-  for (const [k, v] of Object.entries(snap.xg || {})) { const [d, h, a] = k.split('|'); xg.set(`${d}|${cn(h)}|${cn(a)}`, v); }
+  const xg = new Map(Object.entries(snap.xg || {}));
   for (const r of data.played) {
     const v = xg.get(`${isoDay(r.day)}|${r.h}|${r.a}`);
     if (v) { r.xh = v[0]; r.xa = v[1]; data.xgN++; }
   }
-  // Champions League: this season's clubs and upcoming matches
-  for (const e of snap.extra || []) if (e.cup && e.season === data.cur) { data.cupTeams.add(cn(e.h)); data.cupTeams.add(cn(e.a)); }
-  for (const f of snap.cupFixtures || []) {
-    const h = cn(f.h), a = cn(f.a);
-    data.cupTeams.add(h); data.cupTeams.add(a);
-    const day = parseDay(f.d);
-    if (day >= today) data.fixtures.push({ day, time: f.time ? f.time + ' UTC' : '', h, a, comp: UCL, season: f.season, cup: true, round: f.stage || '' });
-  }
-  data.fixtures.sort((x, y) => x.day - y.day || x.time.localeCompare(y.time));
-  for (const t of data.cupTeams) if (!data.teamLeague.has(t)) data.teamLeague.set(t, UCL);
-  for (const o of snap.odds || []) if (parseDay(o.d) >= today - 1) data.odds.set(`${cn(o.h)}|${cn(o.a)}`, o);
+  for (const o of snap.odds || []) if (parseDay(o.d) >= today - 1) data.odds.set(`${o.h}|${o.a}`, o);
   data.standings = {};
-  for (const [code, t] of Object.entries(snap.standings || {})) data.standings[code] = Object.assign({}, t, { table: (t.table || []).map(r => Object.assign({}, r, { team: cn(r.team) })) });
+  for (const [code, t] of Object.entries(snap.standings || {})) data.standings[code] = Object.assign({}, t, { table: (t.table || []).map(r => Object.assign({}, r)) });
   // Elo ratings where the page's three seasons begin, computed by the collector from 2018 on
   const el = snap.elo;
   if (el && el.ratings && el.start && parseDay(el.start) === seasonStart(data.seasons[2])) {
-    const alias = el.alias || {}, ratings = new Map();
-    const members = new Map();
-    for (const [raw, c] of data.cmap) { if (!members.has(c)) members.set(c, []); members.get(c).push(raw); }
-    for (const [team, raws] of members) {
-      for (const n of [team].concat(raws)) {
-        const k = Object.prototype.hasOwnProperty.call(el.ratings, n) ? n : alias[n];
-        if (k !== undefined && Object.prototype.hasOwnProperty.call(el.ratings, k)) { ratings.set(team, el.ratings[k]); break; }
-      }
-    }
-    for (const t of data.cupTeams) if (!ratings.has(t) && Object.prototype.hasOwnProperty.call(el.ratings, t)) ratings.set(t, el.ratings[t]);
+    const ratings = new Map(Object.entries(el.ratings));
     data.eloStart = { day: parseDay(el.start), ratings, n: ratings.size };
   }
 }
@@ -314,14 +348,16 @@ function fitModel(played, asof, TI, init) {
   const H = new Int32Array(n), A = new Int32Array(n), CC = new Int32Array(n);
   const X = new Float64Array(n), Y = new Float64Array(n), W = new Float64Array(n);
   const GX = new Float64Array(n), GY = new Float64Array(n);     // real scores: rho is estimated on these
-  const k = Math.LN2 / CFG.halfLife, xw = CFG.xgWeight || 0;
+  const k = Math.LN2 / CFG.halfLife, xw = CFG.xgWeight || 0, sw = CFG.shotWeight || 0;
   for (let m = 0; m < n; m++) {
     const r = rows[m];
     H[m] = TI.idx.get(r.h); A[m] = TI.idx.get(r.a); CC[m] = ci.get(r.comp);
     GX[m] = r.hg; GY[m] = r.ag;
-    // targets: goals, or a blend of goals and xG where Understat has the match
-    X[m] = xw > 0 && r.xh !== undefined ? (1 - xw) * r.hg + xw * r.xh : r.hg;
-    Y[m] = xw > 0 && r.xa !== undefined ? (1 - xw) * r.ag + xw * r.xa : r.ag;
+    // targets: goals, or a blend of goals and xG where Understat has the match, else of goals and
+    // shot-based expected goals where ESPN has the shots
+    if (xw > 0 && r.xh !== undefined) { X[m] = (1 - xw) * r.hg + xw * r.xh; Y[m] = (1 - xw) * r.ag + xw * r.xa; }
+    else if (sw > 0 && r.sxh !== undefined) { X[m] = (1 - sw) * r.hg + sw * r.sxh; Y[m] = (1 - sw) * r.ag + sw * r.sxa; }
+    else { X[m] = r.hg; Y[m] = r.ag; }
     W[m] = Math.exp(-k * (asof - r.day));
   }
   const att = init ? Float64Array.from(init.att) : new Float64Array(T);
@@ -510,7 +546,7 @@ function eloMapFit(played, asof, init) {
   const xs = [], os = [];
   for (const r of played) {
     if (r.day >= asof) break;
-    if (r.cup || !LG[r.comp] || asof - r.day > CFG.eloMapDays || r.edr === undefined) continue;
+    if (r.cup || !ELO_MAP_COMPS.has(r.comp) || asof - r.day > CFG.eloMapDays || r.edr === undefined) continue;
     xs.push(r.edr / 400); os.push(r.hg > r.ag ? 0 : r.hg === r.ag ? 1 : 2);
   }
   const n = xs.length;
@@ -914,6 +950,7 @@ const simulateLeague = (st, code, opts) => simRun(simSetup(st, code, opts), opts
    begins (00:00 UTC), then locked for good, and scored once the result is in. The archive lives in
    data/forecasts.json in the repository, so its git history shows every change. */
 function forecastKey(f) {
+  // a league pairing happens once in the regular season; play-off and championship rounds (and cups) repeat it
   const regular = !f.cup && (!f.round || /^matchday/i.test(f.round));
   return regular ? `${f.season}|${f.comp}|${f.h}|${f.a}` : `${f.season}|${f.comp}|${isoDay(f.day)}|${f.h}|${f.a}`;
 }
@@ -1001,9 +1038,9 @@ function trackSummary(archive, nowMs) {
 }
 
 Object.assign(root, {
-  ENGINE_VERSION, CFG, CFG_HASH, BASE, LEAGUES, HISTORY_ONLY, CUPS, UCL, SECOND_TIER, LG,
+  ENGINE_VERSION, CFG, CFG_HASH, ESPN, LEAGUES, HISTORY, HISTORY_ONLY, CUP_LIST, CUPS, CUP, UCL, SECOND_TIER, LG, ALL_COMPS,
   DAYMS, parseDay, todayDay, utcDayOf, dayDate, isoDay, mondayOf, seasonKeyOf, seasonStart, prevSeason,
-  cleanName, toks, canonicalNames, scoreFt, loadData, buildData, mergeSnapshot,
+  cleanName, toks, canonicalNames, decodeMatches, espnRecord, loadData, buildData, mergeSnapshot,
   teamIndex, fitModel, goalsCap, poissonVec, homeAdv, dcProbs, dcRates,
   eloRun, eloOf, eloMapFit, eloMapProbs, prepare, forecast, laplace, forecastRange, strengthSe,
   scoreOne, walkForward, eceOf, forecastKey, issueForecasts, settleForecasts, trackSummary,

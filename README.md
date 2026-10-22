@@ -2,16 +2,18 @@
 
 Win / draw / loss chances for Europe's football leagues, recomputed from the latest results every time the page opens.
 
+Fourteen leagues — Premier League, La Liga, Bundesliga, Serie A, Ligue 1, Eredivisie, Liga Portugal, Championship, Belgian Pro League, Süper Lig, Scottish Premiership, Austrian Bundesliga, Super League Greece, Danish Superliga — and the Champions, Europa and Conference League.
+
 ## The model
 
-- **Dixon-Coles**, hierarchical and time-decayed: every team has an attack and a defence rating, pulled toward its league's average; a match's weight halves every 240 days; 60 % of the fitting target is Understat xG where it exists. It gives the goal rates, the score grid and the 1X2.
+- **Dixon-Coles**, hierarchical and time-decayed: every team has an attack and a defence rating, pulled toward its league's average; a match's weight halves every 240 days; 60 % of the fitting target is Understat xG where it exists (top five leagues), elsewhere 40 % is shot-based expected goals (0.356 × shots on target). Fitted on every competition, second divisions and UEFA cups included. It gives the goal rates, the score grid and the 1X2.
 - **Elo**, goal-margin, carried from every match since 2018, turned into 1X2 by an ordered logit refitted on the last two years.
-- **MatchLab = 65 % Dixon-Coles + 35 % Elo.** The score grid is rescaled to the blended 1X2 so every number on the page agrees.
+- **MatchLab = 60 % Dixon-Coles + 40 % Elo.** The score grid is rescaled to the blended 1X2 so every number on the page agrees.
 - **Uncertainty**: a 90 % range for each probability and ± for each team rating, from the posterior covariance of the Dixon-Coles ratings (Laplace approximation).
 - **One club, one history**: clubs that openfootball spells differently between seasons or divisions are joined into one team.
 - **Season projections**: the rest of each league season is played 10,000 times with MatchLab's own match forecasts (in a Web Worker), starting from the current table with official point deductions. Team strengths take a random walk over the simulated season so far-off matches are less certain; its size was chosen on 2024/25 and tested on 2025/26 ([model-lab/RESULTS.md](model-lab/RESULTS.md)). The page shows expected points with a 90 % range, the chance of the title, the top places and relegation, and the whole final-position distribution.
 
-Every setting and every candidate change was chosen on 2022/23–2023/24 and tested untouched on 2024/25–2026/27 (nested walk-forward). Only the Elo blend passed: −0.0020 (±0.0012) log-loss on the test seasons. Details, and the tests that failed: [model-lab/RESULTS.md](model-lab/RESULTS.md).
+Every setting and every candidate change was chosen on 2022/23–2023/24 and tested untouched on 2024/25–2026/27 (nested walk-forward). v6: only the Elo blend passed, −0.0020 (±0.0012) log-loss on the test seasons. v7 (ESPN data, every competition, shots): −0.0008 (±0.0010) on the same leagues, better in all five seasons but within the noise; in the six new leagues shots gained −0.0024 (±0.0021). Details, and the tests that failed: [model-lab/RESULTS.md](model-lab/RESULTS.md).
 
 ## Live track record
 
@@ -27,15 +29,16 @@ GitHub Actions (`.github/workflows/update.yml`) runs the collector and the forec
 
 The keys live only in the repository secrets `FOOTBALL_DATA_ORG_KEY` and `ODDS_API_KEY` (Settings → Secrets and variables → Actions). The collector reads them from environment variables; GitHub hides them in the log.
 
-Run one updater only: the website's workflow *or* the Windows task (`install-schedule.cmd`). Both spend credits of the same Odds API key, and together (18 credits a day) they exceed the free 500 a month.
+Run one updater only: the website's workflow *or* the Windows task (`install-schedule.cmd`). Both spend credits of the same Odds API key, and together (22 credits a day) they exceed the free 500 a month.
 
 ## Files
 
 | Path | What it is |
 |---|---|
-| `index.html` | The app. Opens in any modern browser, from disk or from any static host (with `engine.js` next to it). |
-| `engine.js` | Everything that turns data into forecasts: data loading, team identity, Dixon-Coles, Elo, the blend, uncertainty, the backtest and the forecast archive. Shared by the page, its backtest worker and `collector/forecast.mjs`. |
-| `data/latest.js`, `data/latest.json` | Snapshot built by the collector: football-data.org results and official tables, Champions League, Understat xG, bookmaker odds, Elo ratings back to 2018. Optional — without it the app still runs on openfootball alone. |
+| `index.html` | The app. Opens in any modern browser, from disk or from any static host (with `engine.js` and `data/` next to it). |
+| `engine.js` | Everything that turns data into forecasts: data loading (snapshot + this month live from ESPN), Dixon-Coles, Elo, the blend, uncertainty, the backtest and the forecast archive. Shared by the page, its backtest worker and `collector/forecast.mjs`. |
+| `data/latest.js`, `data/latest.json` | Snapshot built by the collector: ESPN results and fixtures of three seasons, football-data.org official tables, Understat xG, bookmaker odds, Elo ratings back to 2018. Required. |
+| `collector/espn.py` | ESPN's scoreboard API: every competition since 2018, cached by month (Python 3, standard library). |
 | `data/forecasts.json`, `data/track.js` | The forecast archive and the summary the page shows (written on GitHub). |
 | `collector/collect.py` | The collector (Python 3, standard library only). |
 | `collector/forecast.mjs` | The forecast archive (Node 18+). |
@@ -51,8 +54,8 @@ Run one updater only: the website's workflow *or* the Windows task (`install-sch
 
 ## Sources
 
-- openfootball / football.json — results and fixtures, fetched live by the page itself
-- football-data.org — results, official tables, Champions League (free tier: 10 calls/min, key required)
+- ESPN (public scoreboard API) — results, fixtures and shots of every competition since 2018; the page adds the current month live
+- football-data.org — official tables (point deductions) and a results cross-check, eight leagues (free tier: 10 calls/min, key required)
 - Understat — expected goals per match, top-5 leagues
 - OpenLigaDB — Bundesliga cross-check
-- The Odds API — 1X2 odds from ~20 bookmakers (free tier 500 credits/month; the collector refreshes at most every 24 h, 9 credits per refresh, however often it runs)
+- The Odds API — 1X2 odds from ~20 bookmakers for the eight original leagues and the three UEFA cups (free tier 500 credits/month; the collector refreshes at most every 24 h, 11 credits per refresh, however often it runs)
